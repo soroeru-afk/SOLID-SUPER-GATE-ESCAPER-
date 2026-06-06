@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Settings, Folder, File as FileIcon, X, Search, Plus, Trash2, Edit2, Upload, Download, Map as MapIcon, ChevronRight, ChevronLeft, Menu, Check, Copy, PanelLeftClose, PanelRightClose, PanelLeftOpen, PanelRightOpen } from 'lucide-react';
+import { Settings, Folder, FolderOpen, File as FileIcon, X, Search, Plus, Minus, RotateCw, Trash2, Edit2, Upload, Download, Map as MapIcon, ChevronRight, ChevronLeft, Menu, Check, Copy, PanelLeftClose, PanelRightClose, PanelLeftOpen, PanelRightOpen } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 // === Types ===
@@ -25,8 +25,14 @@ interface LocationItem {
 interface AppSettings {
   sidebarPosition: 'left' | 'right';
   sidebarWidth: number;
-  theme: 'dark' | 'light';
+  theme: 'navy' | 'dark' | 'light';
   language: 'jp' | 'en';
+  folderIconColor?: string;
+}
+
+interface TabData {
+  id: string;
+  location: LocationItem | null;
 }
 
 const translations = {
@@ -55,6 +61,7 @@ const translations = {
     posRight: '右側に配置',
     theme: 'テーマカラー',
     dark: 'ダーク',
+    navy: 'ネイビー',
     light: 'ライト',
     close: '閉じる',
     desc: '瞬時に場所を移動できる自分専用のどこでもドア',
@@ -62,7 +69,9 @@ const translations = {
     tmDesc1: 'ブラウザ拡張等から直接場所を追加できます。',
     tmDesc2: 'ローカルストレージ sv_locations_sync を購読中。',
     captured: '撮影:',
-    currLoc: 'Current Location:'
+    currLoc: 'Current Location:',
+    newTab: '新しいタブ',
+    clearAllTabs: '全て閉じる'
   },
   en: {
     viewer: 'STREET VIEW VIEWER',
@@ -89,6 +98,7 @@ const translations = {
     posRight: 'Right',
     theme: 'Theme Color',
     dark: 'Dark',
+    navy: 'Navy',
     light: 'Light',
     close: 'Close',
     desc: 'Your personal portal to travel anywhere instantly',
@@ -96,7 +106,9 @@ const translations = {
     tmDesc1: 'Add locations directly from browser extensions.',
     tmDesc2: 'Subscribing to local storage sv_locations_sync.',
     captured: 'Captured:',
-    currLoc: 'CURRENT LOCATION:'
+    currLoc: 'CURRENT LOCATION:',
+    newTab: 'New Tab',
+    clearAllTabs: 'CLEAR ALL'
   }
 };
 
@@ -179,8 +191,9 @@ function processBookmarksHtml(htmlString: string): Omit<LocationItem, 'id' | 'pa
 const DEFAULT_SETTINGS: AppSettings = {
   sidebarPosition: 'left',
   sidebarWidth: 320,
-  theme: 'dark',
+  theme: 'navy',
   language: 'jp',
+  folderIconColor: '#06b6d4',
 };
 
 // === Main App Component ===
@@ -189,8 +202,72 @@ export default function App() {
   const [folderState, setFolderState] = useState<Record<string, boolean>>({});
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [currentItem, setCurrentItem] = useState<LocationItem | null>(null);
+  const [tabs, setTabs] = useState<TabData[]>([]);
+  const [activeTabId, setActiveTabId] = useState<string | null>(null);
   const [bulkTargetFolder, setBulkTargetFolder] = useState('');
+  const [isSelectMode, setIsSelectMode] = useState(false);
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+  
+  const tabsContainerRef = useRef<HTMLDivElement>(null);
+  const scrollInterval = useRef<number | null>(null);
+
+  const startScroll = (direction: 'left' | 'right') => {
+    stopScroll();
+    scrollInterval.current = window.setInterval(() => {
+      if (tabsContainerRef.current) {
+        tabsContainerRef.current.scrollBy({ left: direction === 'left' ? -15 : 15 });
+      }
+    }, 16);
+  };
+
+  const stopScroll = () => {
+    if (scrollInterval.current !== null) {
+      clearInterval(scrollInterval.current);
+      scrollInterval.current = null;
+    }
+  };
+
+  useEffect(() => {
+    return () => stopScroll();
+  }, []);
+
+  const activeTab = tabs.find(t => t.id === activeTabId);
+  const currentItem = activeTab?.location || null;
+
+  useEffect(() => {
+    if (activeTabId && !tabs.find(t => t.id === activeTabId)) {
+      setActiveTabId(tabs.length > 0 ? tabs[tabs.length - 1].id : null);
+    }
+  }, [tabs, activeTabId]);
+
+  const handleItemClick = (item: LocationItem) => {
+    const existingTab = tabs.find(t => t.location?.id === item.id);
+    if (existingTab) {
+      setActiveTabId(existingTab.id);
+      return;
+    }
+    
+    if (tabs.length === 0 || !activeTabId) {
+      const newTabId = crypto.randomUUID();
+      setTabs([...tabs, { id: newTabId, location: item }]);
+      setActiveTabId(newTabId);
+      return;
+    }
+    
+    // Replace the current active tab's location
+    setTabs(tabs.map(t => t.id === activeTabId ? { ...t, location: item } : t));
+  };
+
+  const closeTab = (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    setTabs(prev => prev.filter(t => t.id !== id));
+  };
+
+  const addNewTab = () => {
+    const newTabId = crypto.randomUUID();
+    setTabs([...tabs, { id: newTabId, location: null }]);
+    setActiveTabId(newTabId);
+  };
   
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -273,22 +350,32 @@ export default function App() {
       }
       const savedSettings = localStorage.getItem('sv_settings');
       if (savedSettings) {
-        setSettings({ ...DEFAULT_SETTINGS, ...JSON.parse(savedSettings) });
+        const parsed = JSON.parse(savedSettings);
+        if (parsed.theme === 'dark' && !localStorage.getItem('sv_theme_migrated')) {
+          parsed.theme = 'navy';
+          localStorage.setItem('sv_theme_migrated', 'true');
+        }
+        setSettings({ ...DEFAULT_SETTINGS, ...parsed });
       }
-      const savedCurrentItem = localStorage.getItem('sv_current_item');
-      if (savedCurrentItem) {
-        setCurrentItem(JSON.parse(savedCurrentItem));
+      const savedTabs = localStorage.getItem('sv_tabs');
+      const savedActiveTab = localStorage.getItem('sv_active_tab_id');
+      if (savedTabs) {
+        setTabs(JSON.parse(savedTabs));
+      }
+      if (savedActiveTab) {
+        setActiveTabId(savedActiveTab);
       }
     } catch(e) {}
   }, []);
 
   useEffect(() => {
-    if (currentItem) {
-      localStorage.setItem('sv_current_item', JSON.stringify(currentItem));
+    localStorage.setItem('sv_tabs', JSON.stringify(tabs));
+    if (activeTabId) {
+      localStorage.setItem('sv_active_tab_id', activeTabId);
     } else {
-      localStorage.removeItem('sv_current_item');
+      localStorage.removeItem('sv_active_tab_id');
     }
-  }, [currentItem]);
+  }, [tabs, activeTabId]);
 
   // Save changes
   const saveLocations = (newLocs: LocationItem[]) => {
@@ -348,15 +435,21 @@ export default function App() {
 
   // Derived state
   const folderGroups = useMemo(() => {
-    let filtered = locations;
+    let filtered = [...locations]; // Clone array before sorting
     const lowerQuery = searchQuery.toLowerCase();
     if (lowerQuery) {
-      filtered = locations.filter(i => 
+      filtered = filtered.filter(i => 
         i.title.toLowerCase().includes(lowerQuery) || 
         i.folderName.toLowerCase().includes(lowerQuery)
       );
     }
     
+    // Sort items by title
+    filtered.sort((a, b) => {
+      const cmp = a.title.localeCompare(b.title);
+      return sortOrder === 'asc' ? cmp : -cmp;
+    });
+
     const groups: Record<string, LocationItem[]> = {};
     filtered.forEach(item => {
       const f = item.folderName || 'General';
@@ -364,9 +457,52 @@ export default function App() {
       groups[f].push(item);
     });
     return groups;
-  }, [locations, searchQuery]);
+  }, [locations, searchQuery, sortOrder]);
 
-  const allFolders = useMemo(() => Array.from(new Set(locations.map(i => i.folderName))), [locations]);
+  const allFolders = useMemo(() => Array.from(new Set(locations.map(i => i.folderName))).sort(), [locations]);
+
+  // 階層化したフォルダ構造の定義
+  const hierarchicalFolders = useMemo(() => {
+    const parents: Record<string, {
+      name: string;
+      subGroups: { subName: string; fullName: string; items: LocationItem[] }[];
+      directItems: LocationItem[];
+      totalCount: number;
+    }> = {};
+
+    Object.entries(folderGroups).forEach(([folderName, items]) => {
+      const parts = folderName.split(' / ');
+      const parentName = parts[0].trim();
+      
+      if (!parents[parentName]) {
+        parents[parentName] = {
+          name: parentName,
+          subGroups: [],
+          directItems: [],
+          totalCount: 0
+        };
+      }
+      
+      parents[parentName].totalCount += items.length;
+
+      if (parts.length > 1) {
+        const subName = parts.slice(1).join(' / ').trim();
+        parents[parentName].subGroups.push({
+          subName: subName,
+          fullName: folderName,
+          items: items
+        });
+      } else {
+        parents[parentName].directItems.push(...items);
+      }
+    });
+
+    // ソート
+    return Object.values(parents).sort((a, b) => a.name.localeCompare(b.name)).map(p => {
+      p.subGroups.sort((a, b) => a.subName.localeCompare(b.subName));
+      return p;
+    });
+  }, [folderGroups]);
 
   // Handlers
   const toggleFolder = (folderName: string) => {
@@ -439,19 +575,20 @@ export default function App() {
   const clearAllData = async () => {
     if (await customConfirm('すべての場所データとフォルダを完全に削除します。本当によろしいですか？')) {
       setLocations([]);
-      setCurrentItem(null);
+      setTabs([]);
+      setActiveTabId(null);
       setSelectedIds(new Set());
       localStorage.removeItem('sv_locations_cache');
       localStorage.removeItem('sv_locations_sync');
+      localStorage.removeItem('sv_tabs');
+      localStorage.removeItem('sv_active_tab_id');
     }
   };
 
   const bulkDelete = async () => {
     if (await customConfirm(`選択した ${selectedIds.size} 件の場所を削除しますか？`)) {
       setLocations(prev => prev.filter(i => !selectedIds.has(i.id)));
-      if (currentItem && selectedIds.has(currentItem.id)) {
-        setCurrentItem(null);
-      }
+      setTabs(prev => prev.filter(t => !t.location || !selectedIds.has(t.location.id)));
       setSelectedIds(new Set());
     }
   };
@@ -464,6 +601,52 @@ export default function App() {
     const target = bulkTargetFolder.trim();
     setLocations(prev => prev.map(item => selectedIds.has(item.id) ? { ...item, folderName: target } : item));
     setSelectedIds(new Set());
+  };
+
+  const editParentFolder = async (parentName: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const newName = await customPrompt('新しい親フォルダ名を入力してください', parentName);
+    if (newName && newName.trim() && newName.trim() !== parentName) {
+      const trimmed = newName.trim();
+      setLocations(prev => prev.map(item => {
+        if (item.folderName === parentName) {
+          return { ...item, folderName: trimmed };
+        }
+        if (item.folderName.startsWith(parentName + ' / ')) {
+          return { ...item, folderName: item.folderName.replace(parentName + ' / ', trimmed + ' / ') };
+        }
+        return item;
+      }));
+      setFolderState(prev => {
+        const next = { ...prev };
+        if (next[parentName] !== undefined) {
+          next[trimmed] = next[parentName];
+          delete next[parentName];
+        }
+        Object.keys(next).forEach(key => {
+          if (key.startsWith(parentName + ' / ')) {
+            const newKey = key.replace(parentName + ' / ', trimmed + ' / ');
+            next[newKey] = next[key];
+            delete next[key];
+          }
+        });
+        return next;
+      });
+    }
+  };
+
+  const deleteParentFolder = async (parentName: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (await customConfirm(`親フォルダ「${parentName}」に含まれるすべての子フォルダと場所を削除しますか？`)) {
+      const isTarget = (folder: string) => folder === parentName || folder.startsWith(parentName + ' / ');
+      setLocations(prev => prev.filter(item => !isTarget(item.folderName)));
+      setTabs(prev => prev.filter(t => !t.location || !isTarget(t.location.folderName)));
+      setSelectedIds(prev => {
+        const next = new Set(prev);
+        locations.filter(i => isTarget(i.folderName)).forEach(i => next.delete(i.id));
+        return next;
+      });
+    }
   };
 
   const editFolder = async (folderName: string, e: React.MouseEvent) => {
@@ -487,9 +670,7 @@ export default function App() {
     e.stopPropagation();
     if (await customConfirm(`フォルダ「${folderName}」に含まれるすべての場所を削除しますか？`)) {
       setLocations(prev => prev.filter(item => item.folderName !== folderName));
-      if (currentItem && currentItem.folderName === folderName) {
-        setCurrentItem(null);
-      }
+      setTabs(prev => prev.filter(t => t.location?.folderName !== folderName));
       setSelectedIds(prev => {
         const next = new Set(prev);
         locations.filter(i => i.folderName === folderName).forEach(i => next.delete(i.id));
@@ -509,7 +690,7 @@ export default function App() {
   };
 
   return (
-    <div className={`flex bg-slate-950 text-slate-300 font-sans h-screen overflow-hidden select-none ${settings.theme === 'light' ? 'theme-light' : ''}`}>
+    <div className={`flex bg-slate-950 text-slate-300 font-sans h-screen overflow-hidden select-none ${settings.theme === 'light' ? 'theme-light' : settings.theme === 'dark' ? 'theme-dark' : ''}`}>
       
       {/* Search overlay & basic context layout */}
       <div 
@@ -575,6 +756,53 @@ export default function App() {
             </div>
           </div>
 
+          {/* === Toolbar === */}
+          <div className="flex items-center justify-between text-[10px] font-mono text-slate-500 bg-slate-900/10 px-4 py-2 border-b border-slate-800 shrink-0">
+            <div className="flex items-center gap-4">
+              <span className="font-bold tracking-widest">{locations.length} FILES</span>
+              <button 
+                onClick={() => setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')} 
+                className="flex items-center gap-1 hover:text-slate-300 transition-colors whitespace-nowrap font-bold"
+              >
+                名前順 {sortOrder === 'asc' ? '▼' : '▲'}
+              </button>
+            </div>
+            <div className="flex items-center gap-3">
+              <button 
+                onClick={() => {
+                  setIsSelectMode(!isSelectMode);
+                  if (isSelectMode) setSelectedIds(new Set()); // モード切替時に選択リセット
+                }} 
+                className={`transition-colors whitespace-nowrap px-3 py-0.5 rounded-full border border-transparent font-bold tracking-wider ${isSelectMode ? 'bg-cyan-900/30 text-cyan-400 border-cyan-800 text-[9px]' : 'bg-slate-800/80 hover:bg-slate-700 hover:text-slate-300 text-[9px]'}`}
+              >
+                {isSelectMode ? 'Done' : 'Select'}
+              </button>
+              <div className="flex items-center gap-2.5">
+                <button 
+                  onClick={() => setFolderState(allFolders.reduce((acc, k) => ({...acc, [k]: true}), {}))} 
+                  className="hover:text-slate-300 transition-colors opacity-70 hover:opacity-100" 
+                  title="Expand All"
+                >
+                  <Plus size={14} />
+                </button>
+                <button 
+                  onClick={() => setFolderState({})} 
+                  className="hover:text-slate-300 transition-colors opacity-70 hover:opacity-100" 
+                  title="Collapse All"
+                >
+                  <Minus size={14} />
+                </button>
+                <button 
+                  onClick={() => window.location.reload()} 
+                  className="hover:text-slate-300 transition-colors opacity-70 hover:opacity-100" 
+                  title="Refresh"
+                >
+                  <RotateCw size={12} />
+                </button>
+              </div>
+            </div>
+          </div>
+
           {/* List Area */}
           <div className="flex-1 overflow-y-auto p-2 font-mono text-sm scrollbar-thin">
             {locations.length === 0 ? (
@@ -586,107 +814,189 @@ export default function App() {
                 {t('noMatch')}
               </div>
             ) : (
-              Object.entries(folderGroups).sort().map(([folderName, items]) => {
-                const isOpen = searchQuery ? true : !!folderState[folderName];
-                const folderSelectedCount = items.filter(i => selectedIds.has(i.id)).length;
-                const isAllChecked = items.length > 0 && folderSelectedCount === items.length;
-                const isIndeterminate = folderSelectedCount > 0 && folderSelectedCount < items.length;
-
+              hierarchicalFolders.map(parent => {
+                const isParentOpen = searchQuery ? true : !!folderState[parent.name];
+                
                 return (
-                  <div key={folderName} className="mb-2">
-                    <div className="flex items-center group relative pr-14 ml-[2px]">
-                      <div className="w-[34px] flex items-center justify-center shrink-0">
-                        <input 
-                          type="checkbox"
-                          className="custom-checkbox"
-                          checked={isAllChecked}
-                          ref={el => { if (el) el.indeterminate = isIndeterminate; }}
-                          onChange={(e) => {
-                            const newSet = new Set(selectedIds);
-                            if (e.target.checked) {
-                              items.forEach(i => newSet.add(i.id));
-                            } else {
-                              items.forEach(i => newSet.delete(i.id));
-                            }
-                            setSelectedIds(newSet);
-                          }}
-                        />
-                      </div>
+                  <div key={parent.name} className="mb-2">
+                    {/* 親フォルダ */}
+                    <div className="flex items-center group relative p-1 rounded-sm transition-colors hover:bg-slate-800/50">
                       <button 
-                        className="flex-1 flex items-center py-1.5 hover:bg-slate-800 text-slate-400 hover:text-white rounded-sm transition-colors text-left min-w-0 group-hover:bg-slate-800"
-                        onClick={() => toggleFolder(folderName)}
+                        className="flex-1 flex items-center text-slate-300 hover:text-white transition-colors text-left min-w-0"
+                        onClick={() => toggleFolder(parent.name)}
                       >
-                        <ChevronRight size={14} className={`mr-1 transition-transform shrink-0 ${isOpen ? 'rotate-90' : ''}`} />
-                        <Folder size={14} className="mr-2 opacity-50 shrink-0" />
+                        <ChevronRight size={14} className={`mr-1 transition-transform shrink-0 ${isParentOpen ? 'rotate-90' : ''}`} />
+                        <Folder size={14} className="mr-2 opacity-80 shrink-0" style={{ color: settings.folderIconColor || '#06b6d4' }} />
                         <span className="flex-1 truncate uppercase text-[11px] font-bold tracking-wider">
-                          {folderName}
+                          {parent.name}
                         </span>
-                        <span className="text-[10px] bg-slate-800 px-1.5 rounded-sm opacity-50 shrink-0 mr-2">{items.length}</span>
+                        <span className="text-[9px] bg-slate-800 px-1.5 rounded-sm opacity-50 shrink-0 mr-2">{parent.totalCount}</span>
                       </button>
-                      <div className="absolute right-0 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity bg-slate-900 group-hover:bg-slate-800 px-1 rounded-sm">
-                        <button onClick={(e) => editFolder(folderName, e)} className="p-1 hover:text-cyan-400 text-slate-500 transition-colors cursor-pointer"><Edit2 size={12}/></button>
-                        <button onClick={(e) => deleteFolder(folderName, e)} className="p-1 hover:text-red-400 text-slate-500 transition-colors cursor-pointer"><Trash2 size={12}/></button>
+                      <div className="absolute right-1 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity bg-slate-900 px-1 rounded-sm">
+                        <button onClick={(e) => editParentFolder(parent.name, e)} className="p-1 hover:text-cyan-400 text-slate-500 transition-colors cursor-pointer"><Edit2 size={12}/></button>
+                        <button onClick={(e) => deleteParentFolder(parent.name, e)} className="p-1 hover:text-red-400 text-slate-500 transition-colors cursor-pointer"><Trash2 size={12}/></button>
                       </div>
                     </div>
-                    
-                    {isOpen && (
-                      <div className="mt-1 flex flex-col gap-0.5 pr-2">
-                        {items.map(item => {
+
+                    {isParentOpen && (
+                      <div className="mt-1 pl-3 flex flex-col gap-1">
+                        {/* 子フォルダ */}
+                        {parent.subGroups.map(sub => {
+                          const isSubOpen = searchQuery ? true : !!folderState[sub.fullName];
+                          
+                          return (
+                            <div key={sub.fullName} className="mb-1">
+                              <div className="flex items-center group/sub relative p-1 rounded-sm transition-colors hover:bg-slate-800/30">
+                                <button 
+                                  className="flex-1 flex items-center text-slate-400 hover:text-white transition-colors text-left min-w-0"
+                                  onClick={() => toggleFolder(sub.fullName)}
+                                >
+                                  <ChevronRight size={12} className={`mr-1 transition-transform shrink-0 ${isSubOpen ? 'rotate-90' : ''}`} />
+                                  <FolderOpen size={12} className="mr-2 opacity-50 shrink-0 text-slate-400" />
+                                  <span className="flex-1 truncate text-[10px] font-bold tracking-wide">
+                                    {sub.subName}
+                                  </span>
+                                  <span className="text-[9px] bg-slate-800/50 px-1.5 rounded-sm opacity-40 shrink-0 mr-2">{sub.items.length}</span>
+                                </button>
+                                <div className="absolute right-1 flex gap-1 opacity-0 group-hover/sub:opacity-100 transition-opacity bg-slate-900 px-1 rounded-sm">
+                                  <button onClick={(e) => editFolder(sub.fullName, e)} className="p-1 hover:text-cyan-400 text-slate-500 transition-colors cursor-pointer"><Edit2 size={10}/></button>
+                                  <button onClick={(e) => deleteFolder(sub.fullName, e)} className="p-1 hover:text-red-400 text-slate-500 transition-colors cursor-pointer"><Trash2 size={10}/></button>
+                                </div>
+                              </div>
+
+                              {isSubOpen && (
+                                <div className="mt-1 flex flex-col gap-0.5 pl-4 pr-1 border-l border-slate-800/60 ml-2">
+                                  {sub.items.map(item => {
+                                    const isActive = currentItem?.id === item.id;
+                                    const isChecked = selectedIds.has(item.id);
+                                    return (
+                                      <div 
+                                        key={item.id} 
+                                        className={`
+                                          flex items-center py-1.5 px-2 rounded-sm cursor-pointer border-l-2 transition-colors group/item relative
+                                          ${isActive ? 'bg-cyan-900/20 border-cyan-500 text-cyan-400' : 'border-transparent text-slate-400 hover:bg-slate-800 hover:text-slate-200'}
+                                        `}
+                                        onClick={() => {
+                                          if (isSelectMode) {
+                                            const newSet = new Set(selectedIds);
+                                            if (newSet.has(item.id)) newSet.delete(item.id);
+                                            else newSet.add(item.id);
+                                            setSelectedIds(newSet);
+                                          } else {
+                                            handleItemClick(item);
+                                          }
+                                        }}
+                                      >
+                                        {isSelectMode && (
+                                          <div className="mr-3 flex items-center justify-center shrink-0">
+                                            <input 
+                                              type="checkbox" 
+                                              className="custom-checkbox pointer-events-none"
+                                              checked={isChecked}
+                                              readOnly
+                                            />
+                                          </div>
+                                        )}
+                                        <div className="flex-1 min-w-0 flex flex-col">
+                                          <span className="truncate text-xs font-semibold">{item.title}</span>
+                                          <div className="flex items-center gap-2 mt-0.5">
+                                            <span className="truncate text-[9px] opacity-60">
+                                              {item.parsed?.isValid ? `🧭 ${item.parsed.lat}, ${item.parsed.lng}` : '🗺️ 通常URL'}
+                                            </span>
+                                            {item.capturedDate && (
+                                              <span className="text-[9px] bg-slate-950/50 text-cyan-400 px-1 rounded-sm border border-slate-800 shrink-0 uppercase tracking-widest font-mono">
+                                                {item.capturedDate}
+                                              </span>
+                                            )}
+                                          </div>
+                                        </div>
+                                        <div className="absolute right-2 opacity-0 group-hover/item:opacity-100 transition-opacity flex bg-slate-900 rounded-sm">
+                                          <button 
+                                            className="hover:text-cyan-400 p-1.5 transition-colors shrink-0 disabled:opacity-50"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              setEditTarget(item);
+                                              setIsEditModalOpen(true);
+                                            }}
+                                            disabled={isSelectMode}
+                                          >
+                                            <Edit2 size={12} />
+                                          </button>
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+
+                        {/* 親フォルダ直下のアイテム */}
+                        {parent.directItems.map(item => {
                           const isActive = currentItem?.id === item.id;
                           const isChecked = selectedIds.has(item.id);
                           return (
                             <div 
                               key={item.id} 
                               className={`
-                                flex items-center py-1 rounded-sm cursor-pointer border-l-2 transition-colors group pr-2
+                                flex items-center py-1.5 px-2 rounded-sm cursor-pointer border-l-2 transition-colors group/item relative
                                 ${isActive ? 'bg-cyan-900/20 border-cyan-500 text-cyan-400' : 'border-transparent text-slate-400 hover:bg-slate-800 hover:text-slate-200'}
                               `}
-                              onClick={() => setCurrentItem(item)}
+                              onClick={() => {
+                                if (isSelectMode) {
+                                  const newSet = new Set(selectedIds);
+                                  if (newSet.has(item.id)) newSet.delete(item.id);
+                                  else newSet.add(item.id);
+                                  setSelectedIds(newSet);
+                                } else {
+                                  handleItemClick(item);
+                                }
+                              }}
                             >
-                              <div className="w-[34px] flex justify-center shrink-0">
-                                <input 
-                                  type="checkbox" 
-                                  className="custom-checkbox"
-                                  checked={isChecked}
-                                  onClick={(e) => e.stopPropagation()}
-                                  onChange={(e) => {
-                                    const newSet = new Set(selectedIds);
-                                    if (e.target.checked) newSet.add(item.id);
-                                    else newSet.delete(item.id);
-                                    setSelectedIds(newSet);
-                                  }}
-                                />
-                              </div>
-                              <div className="flex-1 min-w-0 flex flex-col pl-[48px]">
+                              {isSelectMode && (
+                                <div className="mr-3 flex items-center justify-center shrink-0">
+                                  <input 
+                                    type="checkbox" 
+                                    className="custom-checkbox pointer-events-none"
+                                    checked={isChecked}
+                                    readOnly
+                                  />
+                                </div>
+                              )}
+                              <div className="flex-1 min-w-0 flex flex-col">
                                 <span className="truncate text-xs font-semibold">{item.title}</span>
-                                <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-2 mt-0.5">
                                   <span className="truncate text-[9px] opacity-60">
                                     {item.parsed?.isValid ? `🧭 ${item.parsed.lat}, ${item.parsed.lng}` : '🗺️ 通常URL'}
                                   </span>
                                   {item.capturedDate && (
-                                    <span className="text-[9px] bg-cyan-900/50 text-cyan-300 px-1 rounded-sm border border-cyan-800 shrink-0">
-                                      📸 {item.capturedDate}
+                                    <span className="text-[9px] bg-slate-950/50 text-cyan-400 px-1 rounded-sm border border-slate-800 shrink-0 uppercase tracking-widest font-mono">
+                                      {item.capturedDate}
                                     </span>
                                   )}
                                 </div>
                               </div>
-                              <button 
-                                className="opacity-0 group-hover:opacity-100 hover:text-cyan-400 p-1 transition-opacity shrink-0"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setEditTarget(item);
-                                  setIsEditModalOpen(true);
-                                }}
-                              >
-                                <Edit2 size={12} />
-                              </button>
+                              <div className="absolute right-2 opacity-0 group-hover/item:opacity-100 transition-opacity flex bg-slate-900 rounded-sm">
+                                <button 
+                                  className="hover:text-cyan-400 p-1.5 transition-colors shrink-0 disabled:opacity-50"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setEditTarget(item);
+                                    setIsEditModalOpen(true);
+                                  }}
+                                  disabled={isSelectMode}
+                                >
+                                  <Edit2 size={12} />
+                                </button>
+                              </div>
                             </div>
                           );
                         })}
                       </div>
                     )}
                   </div>
-                )
+                );
               })
             )}
           </div>
@@ -771,6 +1081,115 @@ export default function App() {
         {/* === Main Content === */}
         <div className="flex-1 bg-black flex flex-col relative z-10 min-w-0">
           
+          {/* Header Area (always visible to maintain height) */}
+          <div className="h-12 border-b border-slate-800 bg-black/80 backdrop-blur-md px-6 flex items-center justify-between shrink-0 z-20 relative">
+            <div className="flex items-center gap-3 min-w-0 font-mono text-xs">
+              <span className="text-slate-500 uppercase tracking-widest text-[9px]">{t('currLoc')}</span>
+              {(activeTab && currentItem) ? (
+                <>
+                  <span className="text-white truncate font-bold">{currentItem.title}</span>
+                  {currentItem.capturedDate && (
+                    <span className="bg-slate-800 border border-slate-700 text-cyan-400 px-1.5 py-0.5 rounded-sm text-[9px] shrink-0">
+                      {t('captured')} {currentItem.capturedDate}
+                    </span>
+                  )}
+                </>
+              ) : (
+                <span className="text-slate-700 truncate font-bold">-</span>
+              )}
+            </div>
+            <div className="flex gap-2 shrink-0 items-center">
+              <button 
+                onClick={() => setIsSettingsOpen(true)}
+                className="p-1.5 text-slate-400 hover:bg-white/10 hover:text-white rounded-md transition-colors"
+                title="設定"
+              >
+                <Settings size={16} />
+              </button>
+              {(activeTab && currentItem) ? (
+                <a 
+                  href={currentItem.url} 
+                  target="_blank" 
+                  rel="noreferrer"
+                  className="flex items-center gap-1.5 bg-transparent border border-white/40 hover:border-white hover:bg-white/10 text-white font-bold text-[10px] px-3 py-1.5 rounded-md uppercase tracking-wider transition-colors"
+                >
+                  <MapIcon size={12} /> {t('openMap')}
+                </a>
+              ) : (
+                <button 
+                  disabled
+                  className="flex items-center gap-1.5 bg-transparent border border-slate-800 text-slate-600 font-bold text-[10px] px-3 py-1.5 rounded-md uppercase tracking-wider cursor-not-allowed"
+                >
+                  <MapIcon size={12} /> {t('openMap')}
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* === Tab Bar === */}
+          {tabs.length > 0 && (
+            <div className="flex items-center bg-slate-900 border-b border-slate-800 shrink-0 z-20 relative">
+              <button
+                onPointerDown={() => startScroll('left')}
+                onPointerUp={stopScroll}
+                onPointerLeave={stopScroll}
+                className="p-2.5 text-slate-500 hover:text-white hover:bg-slate-800 transition-colors shrink-0"
+              >
+                <ChevronLeft size={16} />
+              </button>
+
+              <div 
+                ref={tabsContainerRef}
+                className="flex-1 flex items-center gap-1 py-2 overflow-x-auto scrollbar-hide"
+              >
+                {tabs.map((tab, idx) => (
+                  <button
+                    key={tab.id}
+                    onClick={() => setActiveTabId(tab.id)}
+                    className={`flex items-center gap-2 px-3 py-1.5 border text-[10px] uppercase font-mono font-bold whitespace-nowrap transition-colors
+                      ${activeTabId === tab.id 
+                        ? 'bg-slate-800 border-slate-600 text-white' 
+                        : 'bg-transparent border-slate-700 border-dashed text-slate-500 hover:bg-slate-800/50 hover:text-slate-300 hover:border-slate-600'
+                      }`}
+                  >
+                    <span className="truncate max-w-[120px]">
+                      {tab.location ? tab.location.title : `TAB ${(idx + 1).toString().padStart(2, '0')}`}
+                    </span>
+                    <X 
+                      size={12} 
+                      className={`opacity-50 hover:opacity-100 cursor-pointer ${activeTabId === tab.id ? 'text-white' : 'text-slate-500'}`} 
+                      onClick={(e) => closeTab(e, tab.id)} 
+                    />
+                  </button>
+                ))}
+                
+                <button 
+                  onClick={addNewTab}
+                  className="flex items-center justify-center w-7 h-7 border border-slate-500 border-dashed text-slate-400 hover:bg-slate-800 hover:border-slate-400 hover:text-slate-300 transition-colors mx-1 shrink-0 rounded-sm"
+                  title={t('newTab')}
+                >
+                  <Plus size={14} strokeWidth={2.5} />
+                </button>
+                
+                <button 
+                  onClick={() => { setTabs([]); setActiveTabId(null); }}
+                  className="flex items-center justify-center px-3 py-1.5 border border-slate-700 border-dashed text-slate-500 hover:bg-slate-800 hover:border-slate-600 hover:text-slate-300 transition-colors text-[10px] uppercase font-mono shrink-0 mr-1"
+                >
+                  {t('clearAllTabs')}
+                </button>
+              </div>
+
+              <button
+                onPointerDown={() => startScroll('right')}
+                onPointerUp={stopScroll}
+                onPointerLeave={stopScroll}
+                className="p-2.5 text-slate-500 hover:text-white hover:bg-slate-800 transition-colors shrink-0"
+              >
+                <ChevronRight size={16} />
+              </button>
+            </div>
+          )}
+
           {/* Sidebar Toggle Button (Expanding tab with wider hit area) */}
           <button
             onClick={() => setIsSidebarOpen(!isSidebarOpen)}
@@ -797,75 +1216,55 @@ export default function App() {
             </div>
           </button>
 
-          {!currentItem ? (
-            <div className="flex-1 flex flex-col items-center justify-center text-center p-8 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-slate-900 to-black relative">
-              <button 
-                onClick={() => setIsSettingsOpen(true)}
-                className="absolute top-4 right-4 p-2 text-slate-500 hover:bg-slate-800 hover:text-white rounded-md transition-colors"
-                title="設定"
-              >
-                <Settings size={18} />
-              </button>
-              <div className="text-6xl font-black font-mono text-white/5 tracking-tighter leading-none mb-4 uppercase">
-                STREET VIEW
-              </div>
-              <p className="text-xs font-mono tracking-widest text-slate-500 mb-8">
-                {t('desc')}
-              </p>
-              <button 
-                onClick={() => fileInputRef.current?.click()}
-                className="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-cyan-400 font-bold text-[10px] tracking-wider uppercase px-4 py-2 rounded-md transition-colors flex items-center gap-2"
-              >
-                <Download size={14} /> {t('loadBookmark')}
-              </button>
-              
-              <div className="mt-12 p-3 bg-cyan-900/10 border border-cyan-900/30 rounded-md text-left text-[10px] font-mono text-slate-400 max-w-sm">
-                <strong className="text-cyan-500 mb-1 block">{t('tmTitle')}</strong>
-                {t('tmDesc1')}<br/>
-                {t('tmDesc2')}
-              </div>
-            </div>
-          ) : (
-            <div className="flex-1 flex flex-col h-full bg-slate-900">
-              <div className="h-12 border-b border-slate-800 bg-black/80 backdrop-blur-md px-6 flex items-center justify-between shrink-0">
-                <div className="flex items-center gap-3 min-w-0 font-mono text-xs">
-                  <span className="text-slate-500 uppercase tracking-widest text-[9px]">{t('currLoc')}</span>
-                  <span className="text-white truncate font-bold">{currentItem.title}</span>
-                  {currentItem.capturedDate && (
-                    <span className="bg-slate-800 border border-slate-700 text-cyan-400 px-1.5 py-0.5 rounded-sm text-[9px] shrink-0">
-                      {t('captured')} {currentItem.capturedDate}
-                    </span>
-                  )}
+          {/* Content Area */}
+          <div className="flex-1 relative bg-slate-950 overflow-hidden">
+            {(!activeTab || !currentItem) && (
+              <div className="absolute inset-0 z-20 flex flex-col items-center justify-center text-center p-8 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-slate-900 to-black">
+                <button 
+                  onClick={() => setIsSettingsOpen(true)}
+                  className="absolute top-4 right-4 p-2 text-slate-500 hover:bg-slate-800 hover:text-white rounded-md transition-colors"
+                  title="設定"
+                >
+                  <Settings size={18} />
+                </button>
+                <div className="text-6xl font-black font-mono text-white/5 tracking-tighter leading-none mb-4 uppercase">
+                  STREET VIEW
                 </div>
-                <div className="flex gap-2 shrink-0 items-center">
-                  <button 
-                    onClick={() => setIsSettingsOpen(true)}
-                    className="p-1.5 text-slate-400 hover:bg-white/10 hover:text-white rounded-md transition-colors"
-                    title="設定"
-                  >
-                    <Settings size={16} />
-                  </button>
-                  <a 
-                    href={currentItem.url} 
-                    target="_blank" 
-                    rel="noreferrer"
-                    className="flex items-center gap-1.5 bg-transparent border border-white/40 hover:border-white hover:bg-white/10 text-white font-bold text-[10px] px-3 py-1.5 rounded-md uppercase tracking-wider transition-colors"
-                  >
-                    <MapIcon size={12} /> {t('openMap')}
-                  </a>
+                <p className="text-xs font-mono tracking-widest text-slate-500 mb-8">
+                  {t('desc')}
+                </p>
+                <button 
+                  onClick={() => fileInputRef.current?.click()}
+                  className="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-cyan-400 font-bold text-[10px] tracking-wider uppercase px-4 py-2 rounded-md transition-colors flex items-center gap-2"
+                >
+                  <Download size={14} /> {t('loadBookmark')}
+                </button>
+                
+                <div className="mt-12 p-3 bg-cyan-900/10 border border-cyan-900/30 rounded-md text-left text-[10px] font-mono text-slate-400 max-w-sm">
+                  <strong className="text-cyan-500 mb-1 block">{t('tmTitle')}</strong>
+                  {t('tmDesc1')}<br/>
+                  {t('tmDesc2')}
                 </div>
               </div>
-              <div className="flex-1 bg-slate-950 relative flex items-center justify-center">
-                <div className="text-slate-600 font-mono text-xs tracking-widest absolute">{t('loading')}</div>
+            )}
+
+            {/* Render all persistent iframes */}
+            {tabs.filter(t => t.location).map(tab => (
+              <div 
+                key={tab.id}
+                className="absolute inset-0 z-10 bg-slate-950 flex items-center justify-center"
+                style={{ display: activeTabId === tab.id ? 'block' : 'none' }}
+              >
+                <div className="text-slate-600 font-mono text-xs tracking-widest absolute m-4 inset-0 flex justify-center mt-12 pointer-events-none">{t('loading')}</div>
                 <iframe 
-                  key={currentItem.id} // force re-render on change
-                  src={getIframeUrl(currentItem)} 
+                  key={tab.location!.id} // force re-render ONLY if this specific tab's location changes
+                  src={getIframeUrl(tab.location!)} 
                   className="w-full h-full border-none absolute inset-0 z-10" 
                   allowFullScreen
                 />
               </div>
-            </div>
-          )}
+            ))}
+          </div>
         </div>
       </div>
 
@@ -935,7 +1334,13 @@ export default function App() {
                   </label>
                   <div className="flex bg-slate-800 rounded-md p-1 border border-slate-700">
                     <button 
-                      className={`flex-1 flex justify-center items-center py-1.5 text-xs font-bold rounded-sm transition-colors ${(!settings.theme || settings.theme === 'dark') ? 'bg-cyan-600 text-black' : 'text-slate-400 hover:text-slate-200'}`}
+                      className={`flex-1 flex justify-center items-center py-1.5 text-xs font-bold rounded-sm transition-colors ${(!settings.theme || settings.theme === 'navy') ? 'bg-cyan-600 text-black' : 'text-slate-400 hover:text-slate-200'}`}
+                      onClick={() => saveSettings({ ...settings, theme: 'navy' })}
+                    >
+                      {t('navy')}
+                    </button>
+                    <button 
+                      className={`flex-1 flex justify-center items-center py-1.5 text-xs font-bold rounded-sm transition-colors ${settings.theme === 'dark' ? 'bg-cyan-600 text-black' : 'text-slate-400 hover:text-slate-200'}`}
                       onClick={() => saveSettings({ ...settings, theme: 'dark' })}
                     >
                       {t('dark')}
@@ -946,6 +1351,30 @@ export default function App() {
                     >
                       {t('light')}
                     </button>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-[11px] font-bold text-slate-400 uppercase tracking-widest block mb-2">
+                    フォルダー色 (Folder Color)
+                  </label>
+                  <div className="flex items-center gap-3 bg-slate-800 rounded-md p-2 border border-slate-700">
+                    <input 
+                      type="color" 
+                      value={settings.folderIconColor || '#06b6d4'} 
+                      onChange={(e) => saveSettings({ ...settings, folderIconColor: e.target.value })}
+                      className="w-8 h-8 rounded border border-slate-600 bg-transparent cursor-pointer shrink-0"
+                    />
+                    <div className="flex-1 flex flex-wrap gap-1.5">
+                      {['#06b6d4', '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#ec4899', '#8b5cf6', '#a1a1aa'].map(c => (
+                        <button
+                          key={c}
+                          style={{ backgroundColor: c }}
+                          onClick={() => saveSettings({ ...settings, folderIconColor: c })}
+                          className={`w-5 h-5 rounded-full border transition-transform ${settings.folderIconColor === c ? 'scale-110 border-white' : 'border-transparent hover:scale-105'}`}
+                        />
+                      ))}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -982,7 +1411,7 @@ export default function App() {
             }}
             onDelete={(id) => {
               setLocations(prev => prev.filter(i => i.id !== id));
-              if (currentItem?.id === id) setCurrentItem(null);
+              setTabs(prev => prev.filter(t => t.location?.id !== id));
               setIsEditModalOpen(false);
             }}
             initialData={editTarget}

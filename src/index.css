@@ -13,18 +13,34 @@
 .theme-light {
   --color-slate-950: #f8fafc;
   --color-slate-900: #ffffff;
-  --color-slate-800: #f1f5f9;
-  --color-slate-700: #e2e8f0;
-  --color-slate-600: #cbd5e1;
-  --color-slate-500: #64748b;
-  --color-slate-400: #475569;
-  --color-slate-300: #334155;
-  --color-slate-200: #1e293b;
+  --color-slate-800: #e2e8f0;
+  --color-slate-700: #cbd5e1;
+  --color-slate-600: #94a3b8;
+  --color-slate-500: #475569;
+  --color-slate-400: #334155;
+  --color-slate-300: #1e293b;
+  --color-slate-200: #0f172a;
   --color-white: #0f172a;
   --color-black: #ffffff;
 
-  --scrollbar-thumb: rgba(0, 0, 0, 0.1);
-  --scrollbar-thumb-hover: rgba(0, 0, 0, 0.2);
+  --scrollbar-thumb: rgba(0, 0, 0, 0.15);
+  --scrollbar-thumb-hover: rgba(0, 0, 0, 0.25);
+}
+
+/* Dark Theme Overrides (Pure Black/Neutral) */
+.theme-dark {
+  --color-slate-950: #000000;
+  --color-slate-900: #0a0a0a;
+  --color-slate-800: #171717;
+  --color-slate-700: #262626;
+  --color-slate-600: #404040;
+  --color-slate-500: #525252;
+  --color-slate-400: #737373;
+  --color-slate-300: #a3a3a3;
+  --color-slate-200: #e5e5e5;
+
+  --scrollbar-thumb: rgba(255, 255, 255, 0.15);
+  --scrollbar-thumb-hover: rgba(255, 255, 255, 0.25);
 }
 
 /* Global scrollbar styling to make it subtle across all browsers */
@@ -86,5 +102,13 @@
   }
   .scrollbar-thin::-webkit-scrollbar-thumb:hover {
     background-color: var(--scrollbar-thumb-hover);
+  }
+
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+  .scrollbar-hide {
+    -ms-overflow-style: none; /* IE and Edge */
+    scrollbar-width: none; /* Firefox */
   }
 }
