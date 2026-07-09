@@ -1136,7 +1136,7 @@ export default function App() {
           <div className="absolute top-0 left-1/2 -translate-x-1/2 z-50">
             <button 
               onClick={() => setIsImmersive(!isImmersive)}
-              className="bg-black/60 hover:bg-black/80 backdrop-blur-md px-4 py-1 rounded-b-xl border-x border-b border-white/10 text-white/50 hover:text-white transition-all shadow-lg"
+              className="bg-black/20 hover:bg-black/50 backdrop-blur-md px-4 py-1 rounded-b-xl border-x border-b border-white/5 text-white/30 hover:text-white transition-all shadow-lg"
               title={isImmersive ? t('showUI') : t('hideUI')}
             >
               {isImmersive ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
@@ -1147,7 +1147,7 @@ export default function App() {
           {(isImmersive && isFullscreen) && (
             <button
               onClick={toggleFullscreen}
-              className="absolute top-4 right-4 z-50 bg-black/50 hover:bg-black/100 backdrop-blur-md p-3 rounded-full border border-white/10 text-white/70 hover:text-white transition-all shadow-lg"
+              className="absolute top-4 right-4 z-50 bg-black/20 hover:bg-black/60 backdrop-blur-md p-3 rounded-full border border-white/10 text-white/50 hover:text-white transition-all shadow-lg"
               title={t('exitFullscreen')}
             >
               <Minimize size={20} />
@@ -1368,7 +1368,6 @@ export default function App() {
                   key={tab.location!.id} // force re-render ONLY if this specific tab's location changes
                   src={getIframeUrl(tab.location!)} 
                   className="w-full h-full border-none absolute inset-0 z-10" 
-                  allowFullScreen
                 />
               </div>
             ))}
