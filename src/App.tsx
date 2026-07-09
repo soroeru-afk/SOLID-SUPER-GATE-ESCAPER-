@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Settings, Folder, FolderOpen, File as FileIcon, X, Search, Plus, Minus, RotateCw, Trash2, Edit2, Upload, Download, Map as MapIcon, ChevronRight, ChevronLeft, Menu, Check, Copy, PanelLeftClose, PanelRightClose, PanelLeftOpen, PanelRightOpen } from 'lucide-react';
+import { Settings, Folder, FolderOpen, File as FileIcon, X, Search, Plus, Minus, RotateCw, Trash2, Edit2, Upload, Download, Map as MapIcon, ChevronRight, ChevronLeft, ChevronUp, ChevronDown, Menu, Check, Copy, PanelLeftClose, PanelRightClose, PanelLeftOpen, PanelRightOpen, Maximize, Minimize } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 // === Types ===
@@ -28,6 +28,7 @@ interface AppSettings {
   theme: 'navy' | 'dark' | 'light';
   language: 'jp' | 'en';
   folderIconColor?: string;
+  sidebarOpacity?: number;
 }
 
 interface TabData {
@@ -71,7 +72,12 @@ const translations = {
     captured: '撮影:',
     currLoc: 'Current Location:',
     newTab: '新しいタブ',
-    clearAllTabs: '全て閉じる'
+    clearAllTabs: '全て閉じる',
+    fullscreen: 'フルスクリーン',
+    exitFullscreen: 'フルスクリーン解除',
+    hideUI: 'ヘッダーを隠す',
+    showUI: 'ヘッダーを表示',
+    sidebarOpacity: 'サイドバー透明度'
   },
   en: {
     viewer: 'STREET VIEW VIEWER',
@@ -108,7 +114,12 @@ const translations = {
     captured: 'Captured:',
     currLoc: 'CURRENT LOCATION:',
     newTab: 'New Tab',
-    clearAllTabs: 'CLEAR ALL'
+    clearAllTabs: 'CLEAR ALL',
+    fullscreen: 'Fullscreen',
+    exitFullscreen: 'Exit Fullscreen',
+    hideUI: 'Hide UI',
+    showUI: 'Show UI',
+    sidebarOpacity: 'Sidebar Opacity'
   }
 };
 
@@ -194,6 +205,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   theme: 'navy',
   language: 'jp',
   folderIconColor: '#06b6d4',
+  sidebarOpacity: 1.0,
 };
 
 // === Main App Component ===
@@ -278,6 +290,38 @@ export default function App() {
   const t = (key: keyof typeof translations.jp) => translations[settings.language][key];
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isImmersive, setIsImmersive] = useState(false);
+
+  useEffect(() => {
+    const onFullscreenChange = () => {
+      setIsFullscreen(!!(document.fullscreenElement || (document as any).webkitFullscreenElement));
+    };
+    document.addEventListener('fullscreenchange', onFullscreenChange);
+    document.addEventListener('webkitfullscreenchange', onFullscreenChange);
+    return () => {
+      document.removeEventListener('fullscreenchange', onFullscreenChange);
+      document.removeEventListener('webkitfullscreenchange', onFullscreenChange);
+    };
+  }, []);
+
+  const toggleFullscreen = () => {
+    const docEl = document.documentElement as any;
+    if (!document.fullscreenElement && !docEl.webkitFullscreenElement) {
+      if (docEl.requestFullscreen) {
+        docEl.requestFullscreen().catch(console.error);
+      } else if (docEl.webkitRequestFullscreen) {
+        docEl.webkitRequestFullscreen();
+      }
+    } else {
+      if (document.exitFullscreen) {
+        document.exitFullscreen().catch(console.error);
+      } else if ((document as any).webkitExitFullscreen) {
+        (document as any).webkitExitFullscreen();
+      }
+    }
+  };
 
   // === Custom Dialog State ===
   const [dialogState, setDialogState] = useState<{
@@ -700,11 +744,18 @@ export default function App() {
         
         {/* === Sidebar === */}
         <div 
-          className="flex flex-col bg-slate-900 border-slate-800 shrink-0 h-full relative z-20"
+          className="flex flex-col bg-slate-900 border-slate-800 shrink-0 h-full z-40 transition-all duration-300"
           style={{ 
+            position: 'absolute',
+            top: 0,
+            bottom: 0,
             width: isSidebarOpen ? `${settings.sidebarWidth}px` : '0px', 
+            left: settings.sidebarPosition === 'left' ? 0 : 'auto',
+            right: settings.sidebarPosition === 'right' ? 0 : 'auto',
             borderRightWidth: isSidebarOpen && settings.sidebarPosition === 'left' ? '1px' : '0',
             borderLeftWidth: isSidebarOpen && settings.sidebarPosition === 'right' ? '1px' : '0',
+            opacity: settings.sidebarOpacity ?? 1,
+            pointerEvents: isSidebarOpen ? 'auto' : 'none',
             overflow: 'hidden'
           }}
         >
@@ -1081,54 +1132,110 @@ export default function App() {
         {/* === Main Content === */}
         <div className="flex-1 bg-black flex flex-col relative z-10 min-w-0">
           
-          {/* Header Area (always visible to maintain height) */}
-          <div className="h-12 border-b border-slate-800 bg-black/80 backdrop-blur-md px-6 flex items-center justify-between shrink-0 z-20 relative">
-            <div className="flex items-center gap-3 min-w-0 font-mono text-xs">
-              <span className="text-slate-500 uppercase tracking-widest text-[9px]">{t('currLoc')}</span>
-              {(activeTab && currentItem) ? (
-                <>
-                  <span className="text-white truncate font-bold">{currentItem.title}</span>
-                  {currentItem.capturedDate && (
-                    <span className="bg-slate-800 border border-slate-700 text-cyan-400 px-1.5 py-0.5 rounded-sm text-[9px] shrink-0">
-                      {t('captured')} {currentItem.capturedDate}
-                    </span>
-                  )}
-                </>
-              ) : (
-                <span className="text-slate-700 truncate font-bold">-</span>
-              )}
-            </div>
-            <div className="flex gap-2 shrink-0 items-center">
-              <button 
-                onClick={() => setIsSettingsOpen(true)}
-                className="p-1.5 text-slate-400 hover:bg-white/10 hover:text-white rounded-md transition-colors"
-                title="設定"
-              >
-                <Settings size={16} />
-              </button>
-              {(activeTab && currentItem) ? (
-                <a 
-                  href={currentItem.url} 
-                  target="_blank" 
-                  rel="noreferrer"
-                  className="flex items-center gap-1.5 bg-transparent border border-white/40 hover:border-white hover:bg-white/10 text-white font-bold text-[10px] px-3 py-1.5 rounded-md uppercase tracking-wider transition-colors"
-                >
-                  <MapIcon size={12} /> {t('openMap')}
-                </a>
-              ) : (
-                <button 
-                  disabled
-                  className="flex items-center gap-1.5 bg-transparent border border-slate-800 text-slate-600 font-bold text-[10px] px-3 py-1.5 rounded-md uppercase tracking-wider cursor-not-allowed"
-                >
-                  <MapIcon size={12} /> {t('openMap')}
-                </button>
-              )}
-            </div>
+          {/* Immersive Mode Pull Tab */}
+          <div className="absolute top-0 left-1/2 -translate-x-1/2 z-50">
+            <button 
+              onClick={() => setIsImmersive(!isImmersive)}
+              className="bg-black/60 hover:bg-black/80 backdrop-blur-md px-4 py-1 rounded-b-xl border-x border-b border-white/10 text-white/50 hover:text-white transition-all shadow-lg"
+              title={isImmersive ? t('showUI') : t('hideUI')}
+            >
+              {isImmersive ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
+            </button>
           </div>
 
+          {/* Floating Exit Fullscreen Button */}
+          {(isImmersive && isFullscreen) && (
+            <button
+              onClick={toggleFullscreen}
+              className="absolute top-4 right-4 z-50 bg-black/50 hover:bg-black/100 backdrop-blur-md p-3 rounded-full border border-white/10 text-white/70 hover:text-white transition-all shadow-lg"
+              title={t('exitFullscreen')}
+            >
+              <Minimize size={20} />
+            </button>
+          )}
+
+          {/* Header Area (always visible to maintain height) */}
+          {!isImmersive && (
+            <div 
+              className="h-12 border-b border-slate-800 bg-black/80 backdrop-blur-md flex items-center justify-between shrink-0 z-20 relative transition-all duration-300"
+              style={{ 
+                paddingRight: (isSidebarOpen && settings.sidebarPosition === 'right') ? `${settings.sidebarWidth + 24}px` : '24px',
+                paddingLeft: (isSidebarOpen && settings.sidebarPosition === 'left') ? `${settings.sidebarWidth + 24}px` : '24px',
+              }}
+            >
+              <div className="flex items-center gap-3 min-w-0 font-mono text-xs">
+                <span className="text-slate-500 uppercase tracking-widest text-[9px]">{t('currLoc')}</span>
+                {(activeTab && currentItem) ? (
+                  <>
+                    <span className="text-white truncate font-bold">{currentItem.title}</span>
+                    {currentItem.capturedDate && (
+                      <span className="bg-slate-800 border border-slate-700 text-cyan-400 px-1.5 py-0.5 rounded-sm text-[9px] shrink-0">
+                        {t('captured')} {currentItem.capturedDate}
+                      </span>
+                    )}
+                  </>
+                ) : (
+                  <span className="text-slate-700 truncate font-bold">-</span>
+                )}
+              </div>
+              <div className="flex gap-2 shrink-0 items-center">
+                {isSidebarOpen && (
+                  <div className="flex items-center gap-2 mr-2">
+                    <span className="text-[10px] text-slate-500 font-bold uppercase hidden sm:block">{t('sidebarOpacity')}</span>
+                    <input 
+                      type="range" 
+                      min="10" 
+                      max="100" 
+                      value={Math.round((settings.sidebarOpacity ?? 1) * 100)} 
+                      onChange={(e) => saveSettings({ ...settings, sidebarOpacity: Number(e.target.value) / 100 })}
+                      className="w-16 sm:w-24 accent-cyan-500 h-1 bg-slate-800 rounded-lg appearance-none cursor-pointer"
+                    />
+                  </div>
+                )}
+                <button 
+                  onClick={toggleFullscreen}
+                  className="p-1.5 text-slate-400 hover:bg-white/10 hover:text-white rounded-md transition-colors"
+                  title={isFullscreen ? t('exitFullscreen') : t('fullscreen')}
+                >
+                  {isFullscreen ? <Minimize size={16} /> : <Maximize size={16} />}
+                </button>
+                <button 
+                  onClick={() => setIsSettingsOpen(true)}
+                  className="p-1.5 text-slate-400 hover:bg-white/10 hover:text-white rounded-md transition-colors"
+                  title="Settings"
+                >
+                  <Settings size={16} />
+                </button>
+                {(activeTab && currentItem) ? (
+                  <a 
+                    href={currentItem.url} 
+                    target="_blank" 
+                    rel="noreferrer"
+                    className="flex items-center gap-1.5 bg-transparent border border-white/40 hover:border-white hover:bg-white/10 text-white font-bold text-[10px] px-3 py-1.5 rounded-md uppercase tracking-wider transition-colors"
+                  >
+                    <MapIcon size={12} /> {t('openMap')}
+                  </a>
+                ) : (
+                  <button 
+                    disabled
+                    className="flex items-center gap-1.5 bg-transparent border border-slate-800 text-slate-600 font-bold text-[10px] px-3 py-1.5 rounded-md uppercase tracking-wider cursor-not-allowed"
+                  >
+                    <MapIcon size={12} /> {t('openMap')}
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* === Tab Bar === */}
-          {tabs.length > 0 && (
-            <div className="flex items-center bg-slate-900 border-b border-slate-800 shrink-0 z-20 relative">
+          {(tabs.length > 0 && !isImmersive) && (
+            <div 
+              className="flex items-center bg-slate-900 border-b border-slate-800 shrink-0 z-20 relative transition-all duration-300"
+              style={{ 
+                paddingRight: (isSidebarOpen && settings.sidebarPosition === 'right') ? `${settings.sidebarWidth}px` : '0px',
+                paddingLeft: (isSidebarOpen && settings.sidebarPosition === 'left') ? `${settings.sidebarWidth}px` : '0px',
+              }}
+            >
               <button
                 onPointerDown={() => startScroll('left')}
                 onPointerUp={stopScroll}
@@ -1193,11 +1300,12 @@ export default function App() {
           {/* Sidebar Toggle Button (Expanding tab with wider hit area) */}
           <button
             onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-            className={`absolute top-1/2 -translate-y-1/2 z-[60] flex items-center justify-center group cursor-pointer
-              ${settings.sidebarPosition === 'left' ? 'left-0' : 'right-0'}`}
+            className="absolute top-1/2 -translate-y-1/2 z-[60] flex items-center justify-center group cursor-pointer transition-all duration-300"
             style={{
               width: '24px',
               height: '100px',
+              left: settings.sidebarPosition === 'left' ? (isSidebarOpen ? `${settings.sidebarWidth}px` : '0px') : 'auto',
+              right: settings.sidebarPosition === 'right' ? (isSidebarOpen ? `${settings.sidebarWidth}px` : '0px') : 'auto',
             }}
             title="サイドバーを開閉"
           >
@@ -1304,6 +1412,24 @@ export default function App() {
                     max="600" 
                     value={settings.sidebarWidth} 
                     onChange={(e) => saveSettings({ ...settings, sidebarWidth: Number(e.target.value) })}
+                    className="w-full accent-cyan-500 h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer"
+                  />
+                </div>
+
+                {/* Opacity Slider */}
+                <div>
+                  <div className="flex justify-between items-center mb-2">
+                    <label className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">
+                      {t('sidebarOpacity')}
+                    </label>
+                    <span className="text-xs font-mono font-bold text-white">{Math.round((settings.sidebarOpacity ?? 1) * 100)}%</span>
+                  </div>
+                  <input 
+                    type="range" 
+                    min="10" 
+                    max="100" 
+                    value={Math.round((settings.sidebarOpacity ?? 1) * 100)} 
+                    onChange={(e) => saveSettings({ ...settings, sidebarOpacity: Number(e.target.value) / 100 })}
                     className="w-full accent-cyan-500 h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer"
                   />
                 </div>
