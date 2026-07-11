@@ -293,13 +293,6 @@ export default function App() {
 
   const t = (key: keyof typeof translations.jp) => translations[settings.language][key];
 
-  const toggleTheme = () => {
-    const themes = ['navy', 'dark', 'light', 'mocha', 'latte'];
-    const currentIdx = themes.indexOf(settings.theme || 'navy');
-    const nextIdx = (currentIdx + 1) % themes.length;
-    saveSettings({ ...settings, theme: themes[nextIdx] });
-  };
-
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -1233,12 +1226,16 @@ export default function App() {
                   {isFullscreen ? <Minimize size={16} /> : <Maximize size={16} />}
                 </button>
                 <button 
-                  onClick={toggleTheme}
-                  className="flex items-center gap-1.5 px-2.5 py-1 text-[10px] font-bold text-white/75 hover:text-white border border-white/10 hover:bg-white/5 rounded-md transition-all uppercase tracking-wider shrink-0"
+                  onClick={() => {
+                    const themes = ['navy', 'dark', 'light', 'mocha', 'latte'] as const;
+                    const currentIndex = themes.indexOf(settings.theme || 'navy');
+                    const nextTheme = themes[(currentIndex + 1) % themes.length];
+                    saveSettings({ ...settings, theme: nextTheme });
+                  }}
+                  className="flex items-center gap-1.5 border border-slate-700 hover:border-cyan-500 hover:bg-white/5 text-[10px] text-slate-400 hover:text-cyan-400 font-bold px-2 py-1 rounded-md uppercase tracking-wider transition-colors shrink-0"
                   title="テーマ切り替え"
                 >
-                  <Palette size={13} />
-                  <span>THEME: {settings.theme || 'navy'}</span>
+                  <Palette size={12} /> THEME: {settings.theme || 'navy'}
                 </button>
                 <button 
                   onClick={() => setIsSettingsOpen(true)}
