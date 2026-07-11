@@ -5,6 +5,9 @@
   --color-slate-900: #14161a;
   --color-slate-950: #0a0c10;
   
+  --color-header-bg: #000000;
+  --color-overlay-bg: #000000;
+  
   --scrollbar-thumb: rgba(255, 255, 255, 0.1);
   --scrollbar-thumb-hover: rgba(255, 255, 255, 0.2);
 }
@@ -22,7 +25,10 @@
   --color-slate-200: #0f172a;
   --color-white: #0f172a;
   --color-black: #ffffff;
-
+  
+  --color-header-bg: #f8fafc;
+  --color-overlay-bg: #0f172a;
+  
   --scrollbar-thumb: rgba(0, 0, 0, 0.15);
   --scrollbar-thumb-hover: rgba(0, 0, 0, 0.25);
 }
@@ -38,9 +44,64 @@
   --color-slate-400: #737373;
   --color-slate-300: #a3a3a3;
   --color-slate-200: #e5e5e5;
-
   --scrollbar-thumb: rgba(255, 255, 255, 0.15);
   --scrollbar-thumb-hover: rgba(255, 255, 255, 0.25);
+}
+
+/* Mocha Theme Overrides (Warm Dark Brown) */
+.theme-mocha {
+  --color-slate-950: #1c1816;
+  --color-slate-900: #26211e;
+  --color-slate-800: #38312d;
+  --color-slate-700: #4a413b;
+  --color-slate-600: #665a53;
+  --color-slate-500: #85766d;
+  --color-slate-400: #a3958c;
+  --color-slate-300: #c2b5ac;
+  --color-slate-200: #e0d6d0;
+  --color-white: #efeae6;
+  --color-black: #1c1816;
+  
+  --color-header-bg: #1c1816;
+  --color-overlay-bg: #1c1816;
+  
+  --scrollbar-thumb: rgba(255, 235, 220, 0.15);
+  --scrollbar-thumb-hover: rgba(255, 235, 220, 0.25);
+  
+  /* Override cyan to a warm caramel accent for Mocha */
+  --color-cyan-900: #463c33;
+  --color-cyan-700: #6c584c;
+  --color-cyan-600: #a98467;
+  --color-cyan-500: #bfa186;
+  --color-cyan-400: #d4c1b3;
+}
+
+/* Latte Theme Overrides (Warm Light Beige/Cafe au lait) */
+.theme-latte {
+  --color-slate-950: #E6D5C3; /* Cafe au lait background */
+  --color-slate-900: #F2E8DC; /* Slightly lighter for cards */
+  --color-slate-800: #d4c5b0;
+  --color-slate-700: #b5a086;
+  --color-slate-600: #9E8668; 
+  --color-slate-500: #4a3a29;
+  --color-slate-400: #33261a;
+  --color-slate-300: #22180e;
+  --color-slate-200: #1a100a;
+  --color-white: #0f0805;
+  --color-black: #F5F0E6; /* Text color for accent buttons */
+  
+  --color-header-bg: #9E8668; /* Requested header color */
+  --color-overlay-bg: #66523d; /* Overlay color */
+  
+  --scrollbar-thumb: rgba(90, 60, 40, 0.15);
+  --scrollbar-thumb-hover: rgba(90, 60, 40, 0.25);
+  
+  /* Override cyan to a warm coffee accent for Latte */
+  --color-cyan-900: #22180e;
+  --color-cyan-700: #4a3a29;
+  --color-cyan-600: #8c765c;
+  --color-cyan-500: #66523d;
+  --color-cyan-400: #7A6652;
 }
 
 /* Global scrollbar styling to make it subtle across all browsers */
@@ -68,8 +129,8 @@
   .custom-checkbox {
     @apply appearance-none w-3.5 h-3.5 rounded-[3px] border border-slate-700 bg-black/20 cursor-pointer relative transition-colors;
   }
-  .theme-light .custom-checkbox {
-    @apply bg-slate-100 border-slate-300;
+  .theme-light .custom-checkbox, .theme-latte .custom-checkbox {
+    @apply bg-slate-100 border-slate-400;
   }
   .custom-checkbox:hover {
     @apply border-slate-500;
@@ -88,7 +149,7 @@
     content: '';
     @apply absolute inset-0 m-auto w-1.5 h-0.5 bg-cyan-400;
   }
-
+  
   .scrollbar-thin::-webkit-scrollbar {
     width: 6px;
     height: 6px;
@@ -103,7 +164,6 @@
   .scrollbar-thin::-webkit-scrollbar-thumb:hover {
     background-color: var(--scrollbar-thumb-hover);
   }
-
   .scrollbar-hide::-webkit-scrollbar {
     display: none;
   }

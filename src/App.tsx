@@ -25,7 +25,7 @@ interface LocationItem {
 interface AppSettings {
   sidebarPosition: 'left' | 'right';
   sidebarWidth: number;
-  theme: 'navy' | 'dark' | 'light';
+  theme: 'navy' | 'dark' | 'light' | 'mocha' | 'latte';
   language: 'jp' | 'en';
   folderIconColor?: string;
   sidebarOpacity?: number;
@@ -64,6 +64,8 @@ const translations = {
     dark: 'ダーク',
     navy: 'ネイビー',
     light: 'ライト',
+    mocha: 'モカ',
+    latte: 'ラテ',
     close: '閉じる',
     desc: '瞬時に場所を移動できる自分専用のどこでもドア',
     tmTitle: '💡 Tampermonkey連携機能:',
@@ -77,7 +79,7 @@ const translations = {
     exitFullscreen: 'フルスクリーン解除',
     hideUI: 'ヘッダーを隠す',
     showUI: 'ヘッダーを表示',
-    sidebarOpacity: 'サイドバー透明度'
+    sidebarOpacity: 'サイドバー透明度',
   },
   en: {
     viewer: 'STREET VIEW VIEWER',
@@ -106,6 +108,8 @@ const translations = {
     dark: 'Dark',
     navy: 'Navy',
     light: 'Light',
+    mocha: 'Mocha',
+    latte: 'Latte',
     close: 'Close',
     desc: 'Your personal portal to travel anywhere instantly',
     tmTitle: '💡 Tampermonkey Integration:',
@@ -119,7 +123,7 @@ const translations = {
     exitFullscreen: 'Exit Fullscreen',
     hideUI: 'Hide UI',
     showUI: 'Show UI',
-    sidebarOpacity: 'Sidebar Opacity'
+    sidebarOpacity: 'Sidebar Opacity',
   }
 };
 
@@ -384,6 +388,8 @@ export default function App() {
     }
   };
 
+  const isLoaded = useRef(false);
+
   // Initialize
   useEffect(() => {
     try {
@@ -403,16 +409,30 @@ export default function App() {
       }
       const savedTabs = localStorage.getItem('sv_tabs');
       const savedActiveTab = localStorage.getItem('sv_active_tab_id');
+      
+      let initialTabsLoaded = false;
       if (savedTabs) {
-        setTabs(JSON.parse(savedTabs));
+        const parsedTabs = JSON.parse(savedTabs);
+        if (Array.isArray(parsedTabs) && parsedTabs.length > 0) {
+          setTabs(parsedTabs);
+          initialTabsLoaded = true;
+        }
       }
-      if (savedActiveTab) {
+      
+      if (!initialTabsLoaded) {
+        const initialTabId = crypto.randomUUID();
+        setTabs([{ id: initialTabId, location: null }]);
+        setActiveTabId(initialTabId);
+      } else if (savedActiveTab) {
         setActiveTabId(savedActiveTab);
       }
-    } catch(e) {}
+    } catch(e) {} finally {
+      isLoaded.current = true;
+    }
   }, []);
 
   useEffect(() => {
+    if (!isLoaded.current) return;
     localStorage.setItem('sv_tabs', JSON.stringify(tabs));
     if (activeTabId) {
       localStorage.setItem('sv_active_tab_id', activeTabId);
@@ -515,6 +535,7 @@ export default function App() {
     }> = {};
 
     Object.entries(folderGroups).forEach(([folderName, items]) => {
+      const locItems = items as LocationItem[];
       const parts = folderName.split(' / ');
       const parentName = parts[0].trim();
       
@@ -527,17 +548,17 @@ export default function App() {
         };
       }
       
-      parents[parentName].totalCount += items.length;
+      parents[parentName].totalCount += locItems.length;
 
       if (parts.length > 1) {
         const subName = parts.slice(1).join(' / ').trim();
         parents[parentName].subGroups.push({
           subName: subName,
           fullName: folderName,
-          items: items
+          items: locItems
         });
       } else {
-        parents[parentName].directItems.push(...items);
+        parents[parentName].directItems.push(...locItems);
       }
     });
 
@@ -734,7 +755,7 @@ export default function App() {
   };
 
   return (
-    <div className={`flex bg-slate-950 text-slate-300 font-sans h-screen overflow-hidden select-none ${settings.theme === 'light' ? 'theme-light' : settings.theme === 'dark' ? 'theme-dark' : ''}`}>
+    <div className={`flex bg-slate-950 text-slate-300 font-sans h-screen overflow-hidden select-none ${settings.theme === 'light' ? 'theme-light' : settings.theme === 'dark' ? 'theme-dark' : settings.theme === 'mocha' ? 'theme-mocha' : settings.theme === 'latte' ? 'theme-latte' : ''}`}>
       
       {/* Search overlay & basic context layout */}
       <div 
@@ -802,7 +823,7 @@ export default function App() {
                 placeholder={t('searchLoc')} 
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-9 pr-3 py-1.5 bg-black/40 border border-slate-700 rounded-md text-xs text-slate-200 focus:border-cyan-500 focus:outline-none transition-colors"
+                className="w-full pl-9 pr-3 py-1.5 bg-header-bg/40 border border-slate-700 rounded-md text-xs text-slate-200 focus:border-cyan-500 focus:outline-none transition-colors"
               />
             </div>
           </div>
@@ -1132,22 +1153,27 @@ export default function App() {
         {/* === Main Content === */}
         <div className="flex-1 bg-black flex flex-col relative z-10 min-w-0">
           
-          {/* Immersive Mode Pull Tab */}
-          <div className="absolute top-0 left-1/2 -translate-x-1/2 z-50">
-            <button 
-              onClick={() => setIsImmersive(!isImmersive)}
-              className="bg-black/20 hover:bg-black/50 backdrop-blur-md px-4 py-1 rounded-b-xl border-x border-b border-white/5 text-white/30 hover:text-white transition-all shadow-lg"
-              title={isImmersive ? t('showUI') : t('hideUI')}
-            >
-              {isImmersive ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
-            </button>
-          </div>
+          {/* Header Toggle Tab */}
+          <button
+            onClick={() => setIsImmersive(!isImmersive)}
+            className="absolute left-1/2 -translate-x-1/2 z-[60] flex items-center justify-center group cursor-pointer transition-all duration-300"
+            style={{
+              height: '24px',
+              width: '100px',
+              top: isImmersive ? '0px' : '48px',
+            }}
+            title={isImmersive ? t('showUI') : t('hideUI')}
+          >
+            <div className="w-16 h-4 flex items-center justify-center bg-header-bg/40 group-hover:bg-header-bg/80 backdrop-blur-sm border border-white/10 rounded-b-lg opacity-30 group-hover:opacity-100 transition-all">
+              {isImmersive ? <ChevronDown size={14} className="text-white" /> : <ChevronUp size={14} className="text-white" />}
+            </div>
+          </button>
 
-          {/* Floating Exit Fullscreen Button */}
+          {/* Floating Exit Fullscreen Button (visible only when immersive mode hides the header and we are in fullscreen) */}
           {(isImmersive && isFullscreen) && (
             <button
               onClick={toggleFullscreen}
-              className="absolute top-4 right-4 z-50 bg-black/20 hover:bg-black/60 backdrop-blur-md p-3 rounded-full border border-white/10 text-white/50 hover:text-white transition-all shadow-lg"
+              className="absolute top-4 right-4 z-[70] p-2 bg-header-bg/50 hover:bg-header-bg/80 text-white rounded-md backdrop-blur-sm transition-all opacity-30 hover:opacity-100 shadow-lg"
               title={t('exitFullscreen')}
             >
               <Minimize size={20} />
@@ -1157,7 +1183,7 @@ export default function App() {
           {/* Header Area (always visible to maintain height) */}
           {!isImmersive && (
             <div 
-              className="h-12 border-b border-slate-800 bg-black/80 backdrop-blur-md flex items-center justify-between shrink-0 z-20 relative transition-all duration-300"
+              className="h-12 border-b border-slate-800 bg-header-bg/80 backdrop-blur-md flex items-center justify-between shrink-0 z-20 relative transition-all duration-300"
               style={{ 
                 paddingRight: (isSidebarOpen && settings.sidebarPosition === 'right') ? `${settings.sidebarWidth + 24}px` : '24px',
                 paddingLeft: (isSidebarOpen && settings.sidebarPosition === 'left') ? `${settings.sidebarWidth + 24}px` : '24px',
@@ -1202,7 +1228,7 @@ export default function App() {
                 <button 
                   onClick={() => setIsSettingsOpen(true)}
                   className="p-1.5 text-slate-400 hover:bg-white/10 hover:text-white rounded-md transition-colors"
-                  title="Settings"
+                  title="設定"
                 >
                   <Settings size={16} />
                 </button>
@@ -1382,7 +1408,7 @@ export default function App() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex justify-center items-center p-4"
+            className="fixed inset-0 z-50 bg-overlay-bg/60 backdrop-blur-sm flex justify-center items-center p-4"
           >
             <motion.div 
               initial={{ scale: 0.95, opacity: 0 }}
@@ -1457,24 +1483,36 @@ export default function App() {
                   <label className="text-[11px] font-bold text-slate-400 uppercase tracking-widest block mb-2">
                     {t('theme')}
                   </label>
-                  <div className="flex bg-slate-800 rounded-md p-1 border border-slate-700">
+                  <div className="flex flex-wrap bg-slate-800 rounded-md p-1 border border-slate-700">
                     <button 
-                      className={`flex-1 flex justify-center items-center py-1.5 text-xs font-bold rounded-sm transition-colors ${(!settings.theme || settings.theme === 'navy') ? 'bg-cyan-600 text-black' : 'text-slate-400 hover:text-slate-200'}`}
+                      className={`flex-1 min-w-[30%] flex justify-center items-center py-1.5 text-xs font-bold rounded-sm transition-colors ${(!settings.theme || settings.theme === 'navy') ? 'bg-cyan-600 text-black' : 'text-slate-400 hover:text-slate-200'}`}
                       onClick={() => saveSettings({ ...settings, theme: 'navy' })}
                     >
                       {t('navy')}
                     </button>
                     <button 
-                      className={`flex-1 flex justify-center items-center py-1.5 text-xs font-bold rounded-sm transition-colors ${settings.theme === 'dark' ? 'bg-cyan-600 text-black' : 'text-slate-400 hover:text-slate-200'}`}
+                      className={`flex-1 min-w-[30%] flex justify-center items-center py-1.5 text-xs font-bold rounded-sm transition-colors ${settings.theme === 'dark' ? 'bg-cyan-600 text-black' : 'text-slate-400 hover:text-slate-200'}`}
                       onClick={() => saveSettings({ ...settings, theme: 'dark' })}
                     >
                       {t('dark')}
                     </button>
                     <button 
-                      className={`flex-1 flex justify-center items-center py-1.5 text-xs font-bold rounded-sm transition-colors ${settings.theme === 'light' ? 'bg-cyan-600 text-black' : 'text-slate-400 hover:text-slate-200'}`}
+                      className={`flex-1 min-w-[30%] flex justify-center items-center py-1.5 text-xs font-bold rounded-sm transition-colors ${settings.theme === 'light' ? 'bg-cyan-600 text-black' : 'text-slate-400 hover:text-slate-200'}`}
                       onClick={() => saveSettings({ ...settings, theme: 'light' })}
                     >
                       {t('light')}
+                    </button>
+                    <button 
+                      className={`flex-1 min-w-[45%] flex justify-center items-center py-1.5 text-xs font-bold rounded-sm transition-colors ${settings.theme === 'mocha' ? 'bg-cyan-600 text-black' : 'text-slate-400 hover:text-slate-200'}`}
+                      onClick={() => saveSettings({ ...settings, theme: 'mocha' })}
+                    >
+                      {t('mocha')}
+                    </button>
+                    <button 
+                      className={`flex-1 min-w-[45%] flex justify-center items-center py-1.5 text-xs font-bold rounded-sm transition-colors ${settings.theme === 'latte' ? 'bg-cyan-600 text-black' : 'text-slate-400 hover:text-slate-200'}`}
+                      onClick={() => saveSettings({ ...settings, theme: 'latte' })}
+                    >
+                      {t('latte')}
                     </button>
                   </div>
                 </div>
@@ -1554,7 +1592,7 @@ export default function App() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex justify-center items-center p-4"
+            className="fixed inset-0 z-[100] bg-overlay-bg/60 backdrop-blur-sm flex justify-center items-center p-4"
           >
             <motion.div 
               initial={{ scale: 0.95, opacity: 0 }}
@@ -1588,7 +1626,7 @@ export default function App() {
                 )}
                 <button 
                   onClick={() => closeDialog(dialogState.type === 'prompt' ? promptValue : true)}
-                  className="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-black rounded-md text-xs font-bold transition-colors shadow-[0_0_15px_rgba(6,182,212,0.3)]"
+                  className="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-black rounded-md text-xs font-bold transition-colors shadow-lg shadow-cyan-500/30"
                 >
                   OK
                 </button>
@@ -1703,7 +1741,7 @@ function EditModal({
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex justify-center items-center p-4"
+      className="fixed inset-0 z-50 bg-overlay-bg/60 backdrop-blur-sm flex justify-center items-center p-4"
     >
       <motion.div 
         initial={{ y: 20, opacity: 0 }}
@@ -1810,7 +1848,7 @@ function EditModal({
             </button>
             <button 
               onClick={handleSave}
-              className="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-black rounded-md text-xs font-bold transition-colors shadow-[0_0_15px_rgba(6,182,212,0.3)]"
+              className="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-black rounded-md text-xs font-bold transition-colors shadow-lg shadow-cyan-500/30"
             >
               保存
             </button>
