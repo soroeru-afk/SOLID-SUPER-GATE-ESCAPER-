@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Settings, Folder, FolderOpen, File as FileIcon, X, Search, Plus, Minus, RotateCw, Trash2, Edit2, Upload, Download, Map as MapIcon, ChevronRight, ChevronLeft, ChevronUp, ChevronDown, Menu, Check, Copy, PanelLeftClose, PanelRightClose, PanelLeftOpen, PanelRightOpen, Maximize, Minimize } from 'lucide-react';
+import { Settings, Folder, FolderOpen, File as FileIcon, X, Search, Plus, Minus, RotateCw, Trash2, Edit2, Upload, Download, Map as MapIcon, ChevronRight, ChevronLeft, ChevronUp, ChevronDown, Menu, Check, Copy, PanelLeftClose, PanelRightClose, PanelLeftOpen, PanelRightOpen, Maximize, Minimize, Palette } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 // === Types ===
@@ -292,6 +292,13 @@ export default function App() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
 
   const t = (key: keyof typeof translations.jp) => translations[settings.language][key];
+
+  const toggleTheme = () => {
+    const themes = ['navy', 'dark', 'light', 'mocha', 'latte'];
+    const currentIdx = themes.indexOf(settings.theme || 'navy');
+    const nextIdx = (currentIdx + 1) % themes.length;
+    saveSettings({ ...settings, theme: themes[nextIdx] });
+  };
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -1224,6 +1231,14 @@ export default function App() {
                   title={isFullscreen ? t('exitFullscreen') : t('fullscreen')}
                 >
                   {isFullscreen ? <Minimize size={16} /> : <Maximize size={16} />}
+                </button>
+                <button 
+                  onClick={toggleTheme}
+                  className="flex items-center gap-1.5 px-2.5 py-1 text-[10px] font-bold text-white/75 hover:text-white border border-white/10 hover:bg-white/5 rounded-md transition-all uppercase tracking-wider shrink-0"
+                  title="テーマ切り替え"
+                >
+                  <Palette size={13} />
+                  <span>THEME: {settings.theme || 'navy'}</span>
                 </button>
                 <button 
                   onClick={() => setIsSettingsOpen(true)}
