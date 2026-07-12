@@ -50,7 +50,7 @@
 
 /* Mocha Theme Overrides (Warm Dark Brown) */
 .theme-mocha {
-  --color-slate-950: #ebd6c5;
+  --color-slate-950: #fdf5eb;
   --color-slate-900: #f5e8dc;
   --color-slate-800: #dcbfa9;
   --color-slate-700: #c4a48b;
@@ -62,11 +62,11 @@
   --color-white: #1c130d;
   --color-black: #f5e8dc;
   
-  --color-header-bg: #dcbfae;
-  --color-overlay-bg: #ebd6c5;
+  --color-header-bg: #59483A;
+  --color-overlay-bg: #fdf5eb;
   
-  --scrollbar-thumb: rgba(255, 235, 220, 0.15);
-  --scrollbar-thumb-hover: rgba(255, 235, 220, 0.25);
+  --scrollbar-thumb: rgba(90, 60, 40, 0.15);
+  --scrollbar-thumb-hover: rgba(90, 60, 40, 0.25);
   
   /* Override cyan to a warm caramel accent for Mocha */
   --color-cyan-900: #1c130d;
