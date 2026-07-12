@@ -215,7 +215,6 @@
 }
 
 /* Override location title and open map button to be black in mocha theme */
-.theme-mocha .h-12.bg-header-bg\/80 .location-title-text,
 .theme-mocha .h-12.bg-header-bg\/80 .open-map-btn {
   color: #1c130d !important;
 }
