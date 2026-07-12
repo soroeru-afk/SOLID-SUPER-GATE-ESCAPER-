@@ -583,9 +583,26 @@ export default function App() {
     reader.onload = async (ev) => {
       const text = ev.target?.result as string;
       let newItems: LocationItem[] = [];
+      let exportedAtInfo = '';
       
       if (file.name.endsWith('.json')) {
-        try { newItems = JSON.parse(text); } catch(err) { await customAlert('JSONパースエラー'); }
+        try {
+          const parsed = JSON.parse(text);
+          if (Array.isArray(parsed)) {
+            newItems = parsed;
+          } else if (parsed && Array.isArray(parsed.locations)) {
+            newItems = parsed.locations;
+            if (parsed.exportedAt) {
+              exportedAtInfo = `\n(データ作成日時: ${parsed.exportedAt})`;
+            }
+          } else {
+            throw new Error('Invalid JSON format');
+          }
+        } catch(err) {
+          await customAlert('JSONパースエラー: 有効なファイルではありません。');
+          e.target.value = '';
+          return;
+        }
       } else {
         const extracted = processBookmarksHtml(text);
         newItems = extracted.map(item => ({
@@ -597,25 +614,37 @@ export default function App() {
 
       if (newItems.length === 0) {
         await customAlert('Google マップのURLを含むブックマークか、有効なJSONが見つかりませんでした。');
+        e.target.value = '';
         return;
       }
 
       setLocations(prev => {
         const added: LocationItem[] = [];
-        const existingUrls = new Set(prev.map(i => i.url));
+        const updatedLocs = [...prev];
+        let updatedCount = 0;
+
         newItems.forEach(item => {
-          if (!existingUrls.has(item.url)) {
-            const parsedItem = {
-              ...item,
-              id: item.id || `item_${Date.now()}_${Math.random()}`,
-              parsed: item.parsed || parseGoogleMapsUrl(item.url)
+          const existingIndex = updatedLocs.findIndex(i => i.url === item.url);
+          const parsedItem = {
+            ...item,
+            id: item.id || `item_${Date.now()}_${Math.random()}`,
+            parsed: item.parsed || parseGoogleMapsUrl(item.url)
+          };
+          if (existingIndex >= 0) {
+            updatedLocs[existingIndex] = {
+              ...updatedLocs[existingIndex],
+              title: item.title || updatedLocs[existingIndex].title,
+              folderName: item.folderName || updatedLocs[existingIndex].folderName,
+              capturedDate: item.capturedDate !== undefined ? item.capturedDate : updatedLocs[existingIndex].capturedDate,
+              parsed: parsedItem.parsed
             };
+            updatedCount++;
+          } else {
             added.push(parsedItem);
-            existingUrls.add(item.url);
           }
         });
-        customAlert(`読み込み完了！\n新規 ${added.length}件の場所を認識しました。`);
-        return [...prev, ...added];
+        customAlert(`読み込み完了！${exportedAtInfo}\n新規 ${added.length}件、更新 ${updatedCount}件の場所を処理しました。`);
+        return [...updatedLocs, ...added];
       });
       e.target.value = '';
     };
@@ -627,12 +656,24 @@ export default function App() {
       await customAlert('エクスポートするデータがありません。');
       return;
     }
-    const dataStr = JSON.stringify(locations, null, 2);
+
+    const now = new Date();
+    const pad = (n: number) => String(n).padStart(2, '0');
+    const formattedDate = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+    const dateStr = `${now.getFullYear()}${pad(now.getMonth()+1)}${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+
+    const exportObj = {
+      version: "1.0",
+      exportedAt: formattedDate,
+      locations: locations
+    };
+
+    const dataStr = JSON.stringify(exportObj, null, 2);
     const blob = new Blob([dataStr], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `streetview_locations_${new Date().toISOString().split('T')[0]}.json`;
+    a.download = `streetview_locations_${dateStr}.json`;
     a.click();
     URL.revokeObjectURL(url);
   };
