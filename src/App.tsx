@@ -765,7 +765,7 @@ export default function App() {
         
         {/* === Sidebar === */}
         <div 
-          className="flex flex-col bg-slate-900 border-slate-800 sidebar-container shrink-0 h-full z-40 transition-all duration-300"
+          className="flex flex-col border-slate-800 sidebar-container shrink-0 h-full z-40 transition-all duration-300"
           style={{ 
             position: 'absolute',
             top: 0,
@@ -775,17 +775,13 @@ export default function App() {
             right: settings.sidebarPosition === 'right' ? 0 : 'auto',
             borderRightWidth: isSidebarOpen && settings.sidebarPosition === 'left' ? '1px' : '0',
             borderLeftWidth: isSidebarOpen && settings.sidebarPosition === 'right' ? '1px' : '0',
-            opacity: settings.sidebarOpacity ?? 1,
             pointerEvents: isSidebarOpen ? 'auto' : 'none',
             overflow: 'hidden'
           }}
         >
           <div style={{ width: `${settings.sidebarWidth}px` }} className="flex flex-col h-full shrink-0">
             {/* Header Area */}
-          <div 
-            className="h-24 px-4 pb-3 pt-4 border-b border-slate-800 bg-header-bg shrink-0 flex items-end justify-between gap-2"
-            style={{ height: '96px' }}
-          >
+          <div className="h-24 px-4 pb-3 pt-4 border-b border-slate-800 bg-header-bg shrink-0 flex items-end justify-between gap-2">
             <div className="flex flex-col">
               <h1 className="text-xl font-black text-transparent bg-clip-text bg-gradient-to-br from-white to-slate-400 tracking-tighter uppercase leading-tight">
                 SOLID SUPER<br/>GATE ESCAPER
@@ -808,7 +804,13 @@ export default function App() {
             </div>
           </div>
 
-          <div className="p-4 border-b border-slate-800 shrink-0 flex flex-col gap-3">
+          <div className="flex flex-col flex-1 min-h-0 relative z-10">
+            {/* === 背景だけを透明にするためのレイヤー === */}
+            <div 
+              className="absolute inset-0 bg-slate-900 -z-10"
+              style={{ opacity: settings.sidebarOpacity ?? 1 }}
+            />
+            <div className="p-4 border-b border-slate-800 shrink-0 flex flex-col gap-3">
             <input type="file" ref={fileInputRef} accept=".html,.json" className="hidden" onChange={handleFileUpload} />
             <button 
               onClick={() => fileInputRef.current?.click()}
@@ -949,7 +951,7 @@ export default function App() {
                                         key={item.id} 
                                         className={`
                                           flex items-center py-1.5 px-2 rounded-sm cursor-pointer border-l-2 transition-colors group/item relative
-                                          ${isActive ? 'bg-cyan-900/20 border-cyan-500 text-cyan-400' : 'border-transparent text-slate-400 hover:bg-slate-800 hover:text-slate-200'}
+                                          ${isActive ? 'bg-cyan-900/20 border-cyan-500 text-cyan-400' : 'border-transparent text-slate-400 hover:bg-slate-800/50 hover:text-slate-200'}
                                         `}
                                         onClick={() => {
                                           if (isSelectMode) {
@@ -1016,7 +1018,7 @@ export default function App() {
                               key={item.id} 
                               className={`
                                 flex items-center py-1.5 px-2 rounded-sm cursor-pointer border-l-2 transition-colors group/item relative
-                                ${isActive ? 'bg-cyan-900/20 border-cyan-500 text-cyan-400' : 'border-transparent text-slate-400 hover:bg-slate-800 hover:text-slate-200'}
+                                ${isActive ? 'bg-cyan-900/20 border-cyan-500 text-cyan-400' : 'border-transparent text-slate-400 hover:bg-slate-800/50 hover:text-slate-200'}
                               `}
                               onClick={() => {
                                 if (isSelectMode) {
@@ -1150,6 +1152,7 @@ export default function App() {
               <Trash2 size={12} /> {t('clearAll')}
             </button>
           </div>
+            </div> {/* End opacity container */}
           </div> {/* End inner wrapper */}
         </div>
 
@@ -1188,9 +1191,10 @@ export default function App() {
             <div 
               className="h-12 border-b border-slate-800 bg-header-bg/80 backdrop-blur-md flex items-center justify-between shrink-0 z-20 relative transition-all duration-300"
               style={{ 
-                height: '48px',
-                paddingRight: (isSidebarOpen && settings.sidebarPosition === 'right') ? `${settings.sidebarWidth + 24}px` : '24px',
-                paddingLeft: (isSidebarOpen && settings.sidebarPosition === 'left') ? `${settings.sidebarWidth + 24}px` : '24px',
+                marginRight: (isSidebarOpen && settings.sidebarPosition === 'right') ? `${settings.sidebarWidth}px` : '0px',
+                marginLeft: (isSidebarOpen && settings.sidebarPosition === 'left') ? `${settings.sidebarWidth}px` : '0px',
+                paddingRight: '24px',
+                paddingLeft: '24px',
               }}
             >
               <div className="flex items-center gap-3 min-w-0 font-mono text-xs">
@@ -1210,16 +1214,38 @@ export default function App() {
               </div>
               <div className="flex gap-2 shrink-0 items-center">
                 {isSidebarOpen && (
-                  <div className="flex items-center gap-2 mr-2">
-                    <span className="text-[10px] text-white/90 font-bold uppercase hidden sm:block">{t('sidebarOpacity')}</span>
-                    <input 
-                      type="range" 
-                      min="10" 
-                      max="100" 
-                      value={Math.round((settings.sidebarOpacity ?? 1) * 100)} 
-                      onChange={(e) => saveSettings({ ...settings, sidebarOpacity: Number(e.target.value) / 100 })}
-                      className="w-16 sm:w-24 accent-cyan-500 h-1.5 bg-black/40 rounded-lg appearance-none cursor-pointer shadow-inner border border-black/20"
-                    />
+                  <div className="flex items-center">
+                    <div className="flex items-center gap-2 mr-4">
+                      <span className="text-[10px] text-white/90 font-bold uppercase hidden sm:block">{t('sidebarOpacity')}</span>
+                      <input 
+                        type="range" 
+                        min="10" 
+                        max="100" 
+                        value={Math.round((settings.sidebarOpacity ?? 1) * 100)} 
+                        onChange={(e) => saveSettings({ ...settings, sidebarOpacity: Number(e.target.value) / 100 })}
+                        className="w-16 sm:w-24 accent-cyan-500 h-1.5 bg-black/40 rounded-lg appearance-none cursor-pointer shadow-inner border border-black/20"
+                      />
+                    </div>
+                    
+                    <div className="hidden sm:block w-px h-4 bg-white/20 mr-2"></div>
+                    <div className="hidden sm:flex items-center gap-2 mr-2">
+                      <span className="text-[10px] text-white/90 font-bold uppercase tracking-wider">SIDEBAR</span>
+                      <div className="flex bg-transparent border border-white/20 rounded-[4px] p-[2px]">
+                        <button 
+                          onClick={() => saveSettings({ ...settings, sidebarPosition: 'left' })}
+                          className={`px-3 py-0.5 text-[9px] font-bold rounded-[3px] transition-colors uppercase ${settings.sidebarPosition === 'left' ? 'bg-black/60 text-white shadow-sm' : 'text-white/50 hover:text-white/80'}`}
+                        >
+                          LEFT
+                        </button>
+                        <button 
+                          onClick={() => saveSettings({ ...settings, sidebarPosition: 'right' })}
+                          className={`px-3 py-0.5 text-[9px] font-bold rounded-[3px] transition-colors uppercase ${settings.sidebarPosition === 'right' ? 'bg-black/60 text-white shadow-sm' : 'text-white/50 hover:text-white/80'}`}
+                        >
+                          RIGHT
+                        </button>
+                      </div>
+                    </div>
+                    <div className="hidden sm:block w-px h-4 bg-white/20 mr-2"></div>
                   </div>
                 )}
                 <button 
@@ -1274,9 +1300,8 @@ export default function App() {
             <div 
               className="flex items-center bg-slate-900 border-b border-slate-800 shrink-0 z-20 relative transition-all duration-300 h-12"
               style={{ 
-                height: '48px',
-                paddingRight: (isSidebarOpen && settings.sidebarPosition === 'right') ? `${settings.sidebarWidth}px` : '0px',
-                paddingLeft: (isSidebarOpen && settings.sidebarPosition === 'left') ? `${settings.sidebarWidth}px` : '0px',
+                marginRight: (isSidebarOpen && settings.sidebarPosition === 'right') ? `${settings.sidebarWidth}px` : '0px',
+                marginLeft: (isSidebarOpen && settings.sidebarPosition === 'left') ? `${settings.sidebarWidth}px` : '0px',
               }}
             >
               <button
