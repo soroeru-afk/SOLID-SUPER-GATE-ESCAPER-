@@ -765,7 +765,7 @@ export default function App() {
         
         {/* === Sidebar === */}
         <div 
-          className="flex flex-col bg-slate-900 border-slate-800 shrink-0 h-full z-40 transition-all duration-300"
+          className="flex flex-col bg-slate-900 border-slate-800 sidebar-container shrink-0 h-full z-40 transition-all duration-300"
           style={{ 
             position: 'absolute',
             top: 0,
@@ -782,14 +782,17 @@ export default function App() {
         >
           <div style={{ width: `${settings.sidebarWidth}px` }} className="flex flex-col h-full shrink-0">
             {/* Header Area */}
-          <div className="p-4 border-b border-slate-800 shrink-0 flex items-end justify-between gap-2">
+          <div 
+            className="h-24 px-4 pb-3 pt-4 border-b border-slate-800 bg-header-bg shrink-0 flex items-end justify-between gap-2"
+            style={{ height: '96px' }}
+          >
             <div className="flex flex-col">
               <h1 className="text-xl font-black text-transparent bg-clip-text bg-gradient-to-br from-white to-slate-400 tracking-tighter uppercase leading-tight">
                 SOLID SUPER<br/>GATE ESCAPER
               </h1>
               <span className="text-[10px] text-cyan-500 font-bold tracking-widest mt-1.5 leading-none">{t('viewer')}</span>
             </div>
-            <div className="flex border border-slate-700 rounded-sm overflow-hidden text-[9px] font-bold shrink-0 mb-[1px]">
+            <div className="flex border border-slate-700 rounded-sm overflow-hidden text-[9px] font-bold shrink-0 mb-[1px] lang-toggle-container">
               <button 
                 onClick={() => saveSettings({ ...settings, language: 'en' })}
                 className={`px-1.5 py-0.5 transition-colors ${settings.language === 'en' ? 'bg-slate-400 text-slate-900' : 'bg-slate-900 text-slate-400 hover:bg-slate-800'}`}
@@ -1185,15 +1188,16 @@ export default function App() {
             <div 
               className="h-12 border-b border-slate-800 bg-header-bg/80 backdrop-blur-md flex items-center justify-between shrink-0 z-20 relative transition-all duration-300"
               style={{ 
+                height: '48px',
                 paddingRight: (isSidebarOpen && settings.sidebarPosition === 'right') ? `${settings.sidebarWidth + 24}px` : '24px',
                 paddingLeft: (isSidebarOpen && settings.sidebarPosition === 'left') ? `${settings.sidebarWidth + 24}px` : '24px',
               }}
             >
               <div className="flex items-center gap-3 min-w-0 font-mono text-xs">
-                <span className="text-slate-500 uppercase tracking-widest text-[9px]">{t('currLoc')}</span>
+                <span className="text-white/90 uppercase tracking-widest text-[9px]">{t('currLoc')}</span>
                 {(activeTab && currentItem) ? (
                   <>
-                    <span className="text-white truncate font-bold">{currentItem.title}</span>
+                    <span className="text-white truncate font-bold location-title-text">{currentItem.title}</span>
                     {currentItem.capturedDate && (
                       <span className="bg-slate-800 border border-slate-700 text-cyan-400 px-1.5 py-0.5 rounded-sm text-[9px] shrink-0">
                         {t('captured')} {currentItem.capturedDate}
@@ -1201,26 +1205,26 @@ export default function App() {
                     )}
                   </>
                 ) : (
-                  <span className="text-slate-700 truncate font-bold">-</span>
+                  <span className="text-white/40 truncate font-bold">-</span>
                 )}
               </div>
               <div className="flex gap-2 shrink-0 items-center">
                 {isSidebarOpen && (
                   <div className="flex items-center gap-2 mr-2">
-                    <span className="text-[10px] text-slate-500 font-bold uppercase hidden sm:block">{t('sidebarOpacity')}</span>
+                    <span className="text-[10px] text-white/90 font-bold uppercase hidden sm:block">{t('sidebarOpacity')}</span>
                     <input 
                       type="range" 
                       min="10" 
                       max="100" 
                       value={Math.round((settings.sidebarOpacity ?? 1) * 100)} 
                       onChange={(e) => saveSettings({ ...settings, sidebarOpacity: Number(e.target.value) / 100 })}
-                      className="w-16 sm:w-24 accent-cyan-500 h-1 bg-slate-800 rounded-lg appearance-none cursor-pointer"
+                      className="w-16 sm:w-24 accent-cyan-500 h-1.5 bg-black/40 rounded-lg appearance-none cursor-pointer shadow-inner border border-black/20"
                     />
                   </div>
                 )}
                 <button 
                   onClick={toggleFullscreen}
-                  className="p-1.5 text-slate-400 hover:bg-white/10 hover:text-white rounded-md transition-colors"
+                  className="p-1.5 text-white/90 hover:bg-white/20 hover:text-white rounded-md transition-colors"
                   title={isFullscreen ? t('exitFullscreen') : t('fullscreen')}
                 >
                   {isFullscreen ? <Minimize size={16} /> : <Maximize size={16} />}
@@ -1232,14 +1236,14 @@ export default function App() {
                     const nextTheme = themes[(currentIndex + 1) % themes.length];
                     saveSettings({ ...settings, theme: nextTheme });
                   }}
-                  className="flex items-center gap-1.5 border border-slate-700 hover:border-cyan-500 hover:bg-white/5 text-[10px] text-slate-400 hover:text-cyan-400 font-bold px-2 py-1 rounded-md uppercase tracking-wider transition-colors shrink-0"
+                  className="flex items-center gap-1.5 border border-white/20 hover:border-cyan-500 hover:bg-white/10 text-[10px] text-white/90 hover:text-cyan-400 font-bold px-2 py-1 rounded-md uppercase tracking-wider transition-colors shrink-0"
                   title="テーマ切り替え"
                 >
                   <Palette size={12} /> THEME: {settings.theme || 'navy'}
                 </button>
                 <button 
                   onClick={() => setIsSettingsOpen(true)}
-                  className="p-1.5 text-slate-400 hover:bg-white/10 hover:text-white rounded-md transition-colors"
+                  className="p-1.5 text-white/90 hover:bg-white/20 hover:text-white rounded-md transition-colors"
                   title="設定"
                 >
                   <Settings size={16} />
@@ -1249,7 +1253,7 @@ export default function App() {
                     href={currentItem.url} 
                     target="_blank" 
                     rel="noreferrer"
-                    className="flex items-center gap-1.5 bg-transparent border border-white/40 hover:border-white hover:bg-white/10 text-white font-bold text-[10px] px-3 py-1.5 rounded-md uppercase tracking-wider transition-colors"
+                    className="flex items-center gap-1.5 bg-transparent border border-white/40 hover:border-white hover:bg-white/10 text-white font-bold text-[10px] px-3 py-1.5 rounded-md uppercase tracking-wider transition-colors open-map-btn"
                   >
                     <MapIcon size={12} /> {t('openMap')}
                   </a>
@@ -1268,8 +1272,9 @@ export default function App() {
           {/* === Tab Bar === */}
           {(tabs.length > 0 && !isImmersive) && (
             <div 
-              className="flex items-center bg-slate-900 border-b border-slate-800 shrink-0 z-20 relative transition-all duration-300"
+              className="flex items-center bg-slate-900 border-b border-slate-800 shrink-0 z-20 relative transition-all duration-300 h-12"
               style={{ 
+                height: '48px',
                 paddingRight: (isSidebarOpen && settings.sidebarPosition === 'right') ? `${settings.sidebarWidth}px` : '0px',
                 paddingLeft: (isSidebarOpen && settings.sidebarPosition === 'left') ? `${settings.sidebarWidth}px` : '0px',
               }}

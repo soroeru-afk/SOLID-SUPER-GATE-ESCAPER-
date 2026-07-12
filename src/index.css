@@ -50,30 +50,30 @@
 
 /* Mocha Theme Overrides (Warm Dark Brown) */
 .theme-mocha {
-  --color-slate-950: #1c1816;
-  --color-slate-900: #26211e;
-  --color-slate-800: #38312d;
-  --color-slate-700: #4a413b;
-  --color-slate-600: #665a53;
-  --color-slate-500: #85766d;
-  --color-slate-400: #a3958c;
-  --color-slate-300: #c2b5ac;
-  --color-slate-200: #e0d6d0;
-  --color-white: #efeae6;
-  --color-black: #1c1816;
+  --color-slate-950: #ebd6c5;
+  --color-slate-900: #f5e8dc;
+  --color-slate-800: #dcbfa9;
+  --color-slate-700: #c4a48b;
+  --color-slate-600: #a8856a;
+  --color-slate-500: #755943;
+  --color-slate-400: #5c4331;
+  --color-slate-300: #473424;
+  --color-slate-200: #332418;
+  --color-white: #1c130d;
+  --color-black: #f5e8dc;
   
-  --color-header-bg: #1c1816;
-  --color-overlay-bg: #1c1816;
+  --color-header-bg: #dcbfae;
+  --color-overlay-bg: #ebd6c5;
   
   --scrollbar-thumb: rgba(255, 235, 220, 0.15);
   --scrollbar-thumb-hover: rgba(255, 235, 220, 0.25);
   
   /* Override cyan to a warm caramel accent for Mocha */
-  --color-cyan-900: #463c33;
-  --color-cyan-700: #6c584c;
-  --color-cyan-600: #a98467;
-  --color-cyan-500: #bfa186;
-  --color-cyan-400: #d4c1b3;
+  --color-cyan-900: #1c130d;
+  --color-cyan-700: #473424;
+  --color-cyan-600: #a8856a;
+  --color-cyan-500: #755943;
+  --color-cyan-400: #5c4331;
 }
 
 /* Latte Theme Overrides (Warm Light Beige/Cafe au lait) */
@@ -81,13 +81,13 @@
   --color-slate-950: #E6D5C3; /* Cafe au lait background */
   --color-slate-900: #F2E8DC; /* Slightly lighter for cards */
   --color-slate-800: #d4c5b0;
-  --color-slate-700: #b5a086;
+  --color-slate-700: #b5a086; 
   --color-slate-600: #9E8668; 
-  --color-slate-500: #4a3a29;
-  --color-slate-400: #33261a;
-  --color-slate-300: #22180e;
-  --color-slate-200: #1a100a;
-  --color-white: #0f0805;
+  --color-slate-500: #66523d; /* Shifted to be darker for better contrast */
+  --color-slate-400: #52402e; 
+  --color-slate-300: #4a3a29;
+  --color-slate-200: #33261a; 
+  --color-white: #22180e; /* Text color inverse */
   --color-black: #F5F0E6; /* Text color for accent buttons */
   
   --color-header-bg: #9E8668; /* Requested header color */
@@ -129,7 +129,7 @@
   .custom-checkbox {
     @apply appearance-none w-3.5 h-3.5 rounded-[3px] border border-slate-700 bg-black/20 cursor-pointer relative transition-colors;
   }
-  .theme-light .custom-checkbox, .theme-latte .custom-checkbox {
+  .theme-light .custom-checkbox, .theme-latte .custom-checkbox, .theme-mocha .custom-checkbox {
     @apply bg-slate-100 border-slate-400;
   }
   .custom-checkbox:hover {
@@ -171,4 +171,73 @@
     -ms-overflow-style: none; /* IE and Edge */
     scrollbar-width: none; /* Firefox */
   }
+}
+
+.theme-mocha .bg-header-bg {
+  --color-white: #f5e8dc;
+  --color-slate-400: #dcbfa9;
+}
+
+.theme-mocha .bg-header-bg {
+  --color-cyan-500: #dcbfa9;
+}
+
+/* Override text colors in header for mocha theme */
+.theme-mocha .h-12.bg-header-bg\/80 .text-white\/90,
+.theme-mocha .h-12.bg-header-bg\/80 .text-white {
+  color: #fdf5eb !important;
+}
+
+.theme-mocha .h-12.bg-header-bg\/80 .hover\:text-white:hover {
+  color: #ffffff !important;
+}
+
+.theme-mocha .h-12.bg-header-bg\/80 .border-white\/20 {
+  border-color: rgba(253, 245, 235, 0.2) !important;
+}
+
+.theme-mocha .h-12.bg-header-bg\/80 .hover\:bg-white\/20:hover {
+  background-color: rgba(253, 245, 235, 0.2) !important;
+}
+
+.theme-mocha .h-12.bg-header-bg\/80 .hover\:bg-white\/10:hover {
+  background-color: rgba(253, 245, 235, 0.1) !important;
+}
+
+/* Also for the sidebar header if needed */
+.theme-mocha .bg-header-bg .text-white\/90,
+.theme-mocha .bg-header-bg .text-white {
+  color: #fdf5eb !important;
+}
+
+.theme-mocha .h-12.bg-header-bg\/80 input[type="range"] {
+  accent-color: #fdf5eb !important;
+}
+
+/* Override location title and open map button to be black in mocha theme */
+.theme-mocha .h-12.bg-header-bg\/80 .location-title-text,
+.theme-mocha .h-12.bg-header-bg\/80 .open-map-btn {
+  color: #1c130d !important;
+}
+
+.theme-mocha .h-12.bg-header-bg\/80 .open-map-btn {
+  border-color: rgba(28, 19, 13, 0.4) !important;
+}
+
+.theme-mocha .h-12.bg-header-bg\/80 .open-map-btn:hover {
+  background-color: rgba(28, 19, 13, 0.1) !important;
+  border-color: #1c130d !important;
+}
+
+/* Override sidebar border in mocha theme */
+.theme-mocha .sidebar-container {
+  border-color: rgba(0, 0, 0, 0.4) !important;
+}
+
+/* Fix language toggle in Mocha header to use Latte theme colors */
+.theme-mocha .lang-toggle-container {
+  --color-slate-400: #33261a;
+  --color-slate-900: #F2E8DC;
+  --color-slate-800: #d4c5b0;
+  --color-slate-700: #b5a086;
 }
