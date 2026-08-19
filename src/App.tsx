@@ -456,6 +456,25 @@ export default function App() {
     } catch(e) {}
   };
 
+  // Update browser theme-color meta tag dynamically based on the current theme
+  useEffect(() => {
+    const themeColors = {
+      navy: '#000000',
+      dark: '#000000',
+      light: '#f8fafc',
+      mocha: '#59483A',
+      latte: '#9E8668',
+    };
+    const color = themeColors[settings.theme] || '#000000';
+    let meta = document.querySelector('meta[name="theme-color"]');
+    if (!meta) {
+      meta = document.createElement('meta');
+      meta.setAttribute('name', 'theme-color');
+      document.head.appendChild(meta);
+    }
+    meta.setAttribute('content', color);
+  }, [settings.theme]);
+
   // Sync Tampermonkey
   useEffect(() => {
     const handleStorage = (e: StorageEvent) => {
