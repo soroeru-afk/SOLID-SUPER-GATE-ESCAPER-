@@ -81,13 +81,13 @@
   --color-slate-950: #E6D5C3; /* Cafe au lait background */
   --color-slate-900: #F2E8DC; /* Slightly lighter for cards */
   --color-slate-800: #d4c5b0;
-  --color-slate-700: #b5a086; 
+  --color-slate-700: #b5a086;
   --color-slate-600: #9E8668; 
-  --color-slate-500: #66523d; /* Shifted to be darker for better contrast */
-  --color-slate-400: #52402e; 
-  --color-slate-300: #4a3a29;
-  --color-slate-200: #33261a; 
-  --color-white: #22180e; /* Text color inverse */
+  --color-slate-500: #4a3a29;
+  --color-slate-400: #33261a;
+  --color-slate-300: #22180e;
+  --color-slate-200: #1a100a;
+  --color-white: #0f0805;
   --color-black: #F5F0E6; /* Text color for accent buttons */
   
   --color-header-bg: #9E8668; /* Requested header color */
@@ -214,14 +214,6 @@
   accent-color: #fdf5eb !important;
 }
 
-/* Override location title and open map button to be black in mocha theme */
-.theme-mocha .h-12.bg-header-bg\/80 .open-map-btn {
-  color: #1c130d !important;
-}
-
-.theme-mocha .h-12.bg-header-bg\/80 .open-map-btn {
-  border-color: rgba(28, 19, 13, 0.4) !important;
-}
 
 .theme-mocha .h-12.bg-header-bg\/80 .open-map-btn:hover {
   background-color: rgba(28, 19, 13, 0.1) !important;

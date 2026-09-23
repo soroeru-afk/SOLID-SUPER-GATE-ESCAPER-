@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Settings, Folder, FolderOpen, File as FileIcon, X, Search, Plus, Minus, RotateCw, Trash2, Edit2, Upload, Download, Map as MapIcon, ChevronRight, ChevronLeft, ChevronUp, ChevronDown, Menu, Check, Copy, PanelLeftClose, PanelRightClose, PanelLeftOpen, PanelRightOpen, Maximize, Minimize, Palette } from 'lucide-react';
+import { Settings, Folder, FolderOpen, File as FileIcon, X, Search, Plus, Minus, RotateCw, Trash2, Edit2, Upload, Download, Map as MapIcon, ChevronRight, ChevronLeft, ChevronsRight, ChevronsLeft, ChevronUp, ChevronDown, Menu, Check, Copy, PanelLeftClose, PanelRightClose, PanelLeftOpen, PanelRightOpen, Maximize, Minimize, Palette, Eye, EyeOff } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 // === Types ===
@@ -225,27 +225,97 @@ export default function App() {
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
   
   const tabsContainerRef = useRef<HTMLDivElement>(null);
-  const scrollInterval = useRef<number | null>(null);
+  const tabRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
+  const lastWheelTime = useRef<number>(0);
 
-  const startScroll = (direction: 'left' | 'right') => {
-    stopScroll();
-    scrollInterval.current = window.setInterval(() => {
-      if (tabsContainerRef.current) {
-        tabsContainerRef.current.scrollBy({ left: direction === 'left' ? -15 : 15 });
-      }
-    }, 16);
+  const currentTabIndex = tabs.findIndex(t => t.id === activeTabId);
+
+  const selectTabByIndex = (targetIndex: number) => {
+    if (tabs.length === 0) return;
+    const clampedIndex = Math.max(0, Math.min(tabs.length - 1, targetIndex));
+    setActiveTabId(tabs[clampedIndex].id);
   };
 
-  const stopScroll = () => {
-    if (scrollInterval.current !== null) {
-      clearInterval(scrollInterval.current);
-      scrollInterval.current = null;
+  const goToPrevTab = () => {
+    if (tabs.length === 0) return;
+    if (currentTabIndex > 0) {
+      selectTabByIndex(currentTabIndex - 1);
+    } else if (currentTabIndex === -1) {
+      selectTabByIndex(0);
     }
   };
 
+  const goToNextTab = () => {
+    if (tabs.length === 0) return;
+    if (currentTabIndex >= 0 && currentTabIndex < tabs.length - 1) {
+      selectTabByIndex(currentTabIndex + 1);
+    } else if (currentTabIndex === -1) {
+      selectTabByIndex(0);
+    }
+  };
+
+  const goToFirstTab = () => {
+    if (tabs.length > 0) {
+      selectTabByIndex(0);
+    }
+  };
+
+  const goToLastTab = () => {
+    if (tabs.length > 0) {
+      selectTabByIndex(tabs.length - 1);
+    }
+  };
+
+  // アクティブタブが切り替わったときにタブバー内で表示領域にスクロール
   useEffect(() => {
-    return () => stopScroll();
-  }, []);
+    if (activeTabId) {
+      const el = tabRefs.current.get(activeTabId);
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
+      }
+    }
+  }, [activeTabId]);
+
+  // タブ領域でのマウスホイール操作によるタブ切り替え
+  // カオルさまのご指定通り: ホイール下回転 -> 左のタブへ / ホイール上回転 -> 右のタブへ
+  useEffect(() => {
+    const el = tabsContainerRef.current;
+    if (!el) return;
+
+    const handleWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      const now = Date.now();
+      // ホイールの連続発火を防ぎ、1ノッチごとに1タブずつ確実に切り替え
+      if (now - lastWheelTime.current < 130) {
+        return;
+      }
+
+      if (Math.abs(e.deltaY) >= Math.abs(e.deltaX)) {
+        if (Math.abs(e.deltaY) < 5) return;
+        lastWheelTime.current = now;
+        if (e.deltaY > 0) {
+          // ホイールを下にした時に左へ動く（前のタブ）
+          goToPrevTab();
+        } else {
+          // ホイールを上に回した時に右に動く（次のタブ）
+          goToNextTab();
+        }
+      } else {
+        if (Math.abs(e.deltaX) < 5) return;
+        lastWheelTime.current = now;
+        if (e.deltaX > 0) {
+          goToNextTab();
+        } else {
+          goToPrevTab();
+        }
+      }
+    };
+
+    el.addEventListener('wheel', handleWheel, { passive: false });
+    return () => {
+      el.removeEventListener('wheel', handleWheel);
+    };
+  }, [tabs, activeTabId, currentTabIndex]);
 
   const activeTab = tabs.find(t => t.id === activeTabId);
   const currentItem = activeTab?.location || null;
@@ -302,13 +372,20 @@ export default function App() {
     const onFullscreenChange = () => {
       setIsFullscreen(!!(document.fullscreenElement || (document as any).webkitFullscreenElement));
     };
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isImmersive) {
+        setIsImmersive(false);
+      }
+    };
     document.addEventListener('fullscreenchange', onFullscreenChange);
     document.addEventListener('webkitfullscreenchange', onFullscreenChange);
+    window.addEventListener('keydown', onKeyDown);
     return () => {
       document.removeEventListener('fullscreenchange', onFullscreenChange);
       document.removeEventListener('webkitfullscreenchange', onFullscreenChange);
+      window.removeEventListener('keydown', onKeyDown);
     };
-  }, []);
+  }, [isImmersive]);
 
   const toggleFullscreen = () => {
     const docEl = document.documentElement as any;
@@ -602,26 +679,9 @@ export default function App() {
     reader.onload = async (ev) => {
       const text = ev.target?.result as string;
       let newItems: LocationItem[] = [];
-      let exportedAtInfo = '';
       
       if (file.name.endsWith('.json')) {
-        try {
-          const parsed = JSON.parse(text);
-          if (Array.isArray(parsed)) {
-            newItems = parsed;
-          } else if (parsed && Array.isArray(parsed.locations)) {
-            newItems = parsed.locations;
-            if (parsed.exportedAt) {
-              exportedAtInfo = `\n(データ作成日時: ${parsed.exportedAt})`;
-            }
-          } else {
-            throw new Error('Invalid JSON format');
-          }
-        } catch(err) {
-          await customAlert('JSONパースエラー: 有効なファイルではありません。');
-          e.target.value = '';
-          return;
-        }
+        try { newItems = JSON.parse(text); } catch(err) { await customAlert('JSONパースエラー'); }
       } else {
         const extracted = processBookmarksHtml(text);
         newItems = extracted.map(item => ({
@@ -633,37 +693,33 @@ export default function App() {
 
       if (newItems.length === 0) {
         await customAlert('Google マップのURLを含むブックマークか、有効なJSONが見つかりませんでした。');
-        e.target.value = '';
         return;
       }
 
       setLocations(prev => {
         const added: LocationItem[] = [];
-        const updatedLocs = [...prev];
         let updatedCount = 0;
+        const newLocations = [...prev];
 
         newItems.forEach(item => {
-          const existingIndex = updatedLocs.findIndex(i => i.url === item.url);
           const parsedItem = {
             ...item,
             id: item.id || `item_${Date.now()}_${Math.random()}`,
             parsed: item.parsed || parseGoogleMapsUrl(item.url)
           };
-          if (existingIndex >= 0) {
-            updatedLocs[existingIndex] = {
-              ...updatedLocs[existingIndex],
-              title: item.title || updatedLocs[existingIndex].title,
-              folderName: item.folderName || updatedLocs[existingIndex].folderName,
-              capturedDate: item.capturedDate !== undefined ? item.capturedDate : updatedLocs[existingIndex].capturedDate,
-              parsed: parsedItem.parsed
-            };
+
+          const existingIndex = newLocations.findIndex(i => i.url === item.url);
+          if (existingIndex !== -1) {
+            newLocations[existingIndex] = { ...newLocations[existingIndex], ...parsedItem, id: newLocations[existingIndex].id };
             updatedCount++;
           } else {
             added.push(parsedItem);
+            newLocations.push(parsedItem);
           }
         });
-        customAlert(`読み込み完了！${exportedAtInfo}\n新規 ${added.length}件、更新 ${updatedCount}件の場所を処理しました。`);
-        return [...updatedLocs, ...added];
+
+        customAlert(`読み込み完了！\n新規追加: ${added.length}件 / 更新: ${updatedCount}件`);
+        return newLocations;
       });
       e.target.value = '';
     };
@@ -675,23 +731,17 @@ export default function App() {
       await customAlert('エクスポートするデータがありません。');
       return;
     }
-
-    const now = new Date();
-    const pad = (n: number) => String(n).padStart(2, '0');
-    const formattedDate = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
-    const dateStr = `${now.getFullYear()}${pad(now.getMonth()+1)}${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
-
-    const exportObj = {
-      version: "1.0",
-      exportedAt: formattedDate,
-      locations: locations
-    };
-
-    const dataStr = JSON.stringify(exportObj, null, 2);
+    const dataStr = JSON.stringify(locations, null, 2);
     const blob = new Blob([dataStr], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
+    
+    // 日付と時間をファイル名に含める
+    const now = new Date();
+    const pad = (n: number) => n.toString().padStart(2, '0');
+    const dateStr = `${now.getFullYear()}${pad(now.getMonth()+1)}${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+    
     a.download = `streetview_locations_${dateStr}.json`;
     a.click();
     URL.revokeObjectURL(url);
@@ -1334,6 +1384,13 @@ export default function App() {
                 >
                   <Settings size={16} />
                 </button>
+                <button 
+                  onClick={() => setIsImmersive(true)}
+                  className="flex items-center gap-1.5 border border-white/20 hover:border-cyan-500 hover:bg-white/10 text-[10px] text-white/90 hover:text-cyan-400 font-bold px-2.5 py-1 rounded-md uppercase tracking-wider transition-colors shrink-0"
+                  title="UIを非表示 (Hide UI)"
+                >
+                  <EyeOff size={13} /> HIDE UI
+                </button>
                 {(activeTab && currentItem) ? (
                   <a 
                     href={currentItem.url} 
@@ -1364,22 +1421,36 @@ export default function App() {
                 marginLeft: (isSidebarOpen && settings.sidebarPosition === 'left') ? `${settings.sidebarWidth}px` : '0px',
               }}
             >
-              <button
-                onPointerDown={() => startScroll('left')}
-                onPointerUp={stopScroll}
-                onPointerLeave={stopScroll}
-                className="p-2.5 text-slate-500 hover:text-white hover:bg-slate-800 transition-colors shrink-0"
-              >
-                <ChevronLeft size={16} />
-              </button>
+              <div className="flex items-center shrink-0 border-r border-slate-800">
+                <button
+                  onClick={goToFirstTab}
+                  disabled={currentTabIndex <= 0}
+                  className="p-2 text-slate-500 hover:text-white hover:bg-slate-800 transition-colors disabled:opacity-30 disabled:pointer-events-none"
+                  title="一番最初のタブへ移動 (最左端)"
+                >
+                  <ChevronsLeft size={16} />
+                </button>
+                <button
+                  onClick={goToPrevTab}
+                  disabled={currentTabIndex <= 0}
+                  className="p-2 text-slate-500 hover:text-white hover:bg-slate-800 transition-colors disabled:opacity-30 disabled:pointer-events-none"
+                  title="前のタブへ移動 (左)"
+                >
+                  <ChevronLeft size={16} />
+                </button>
+              </div>
 
               <div 
                 ref={tabsContainerRef}
-                className="flex-1 flex items-center gap-1 py-2 overflow-x-auto scrollbar-hide"
+                className="flex-1 flex items-center gap-1 py-2 px-1 overflow-x-auto scrollbar-hide"
               >
                 {tabs.map((tab, idx) => (
                   <button
                     key={tab.id}
+                    ref={(node) => {
+                      if (node) tabRefs.current.set(tab.id, node);
+                      else tabRefs.current.delete(tab.id);
+                    }}
                     onClick={() => setActiveTabId(tab.id)}
                     className={`flex items-center gap-2 px-3 py-1.5 border text-[10px] uppercase font-mono font-bold whitespace-nowrap transition-colors
                       ${activeTabId === tab.id 
@@ -1414,14 +1485,24 @@ export default function App() {
                 </button>
               </div>
 
-              <button
-                onPointerDown={() => startScroll('right')}
-                onPointerUp={stopScroll}
-                onPointerLeave={stopScroll}
-                className="p-2.5 text-slate-500 hover:text-white hover:bg-slate-800 transition-colors shrink-0"
-              >
-                <ChevronRight size={16} />
-              </button>
+              <div className="flex items-center shrink-0 border-l border-slate-800">
+                <button
+                  onClick={goToNextTab}
+                  disabled={currentTabIndex >= tabs.length - 1}
+                  className="p-2 text-slate-500 hover:text-white hover:bg-slate-800 transition-colors disabled:opacity-30 disabled:pointer-events-none"
+                  title="次のタブへ移動 (右)"
+                >
+                  <ChevronRight size={16} />
+                </button>
+                <button
+                  onClick={goToLastTab}
+                  disabled={currentTabIndex >= tabs.length - 1}
+                  className="p-2 text-slate-500 hover:text-white hover:bg-slate-800 transition-colors disabled:opacity-30 disabled:pointer-events-none"
+                  title="一番最後のタブへ移動 (最右端)"
+                >
+                  <ChevronsRight size={16} />
+                </button>
+              </div>
             </div>
           )}
 
