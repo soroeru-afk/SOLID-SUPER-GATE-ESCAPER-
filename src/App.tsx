@@ -327,21 +327,47 @@ export default function App() {
   }, [tabs, activeTabId]);
 
   const handleItemClick = (item: LocationItem) => {
-    const existingTab = tabs.find(t => t.location?.id === item.id);
-    if (existingTab) {
-      setActiveTabId(existingTab.id);
-      return;
-    }
-    
+    // タブが1つもない、またはアクティブタブIDがない場合は新規タブを作成して開く
     if (tabs.length === 0 || !activeTabId) {
       const newTabId = crypto.randomUUID();
-      setTabs([...tabs, { id: newTabId, location: item }]);
+      setTabs([{ id: newTabId, location: item }]);
       setActiveTabId(newTabId);
       return;
     }
-    
-    // Replace the current active tab's location
+
+    const currentActiveTab = tabs.find(t => t.id === activeTabId);
+
+    // 現在選択中のアクティブタブが空（locationがnull）の場合、他で開かれていても現在のタブに割り当てる
+    if (currentActiveTab && !currentActiveTab.location) {
+      setTabs(tabs.map(t => t.id === activeTabId ? { ...t, location: item } : t));
+      return;
+    }
+
+    // 現在のアクティブタブがすでに同じ場所を開いている場合は何もしない
+    if (currentActiveTab && currentActiveTab.location?.id === item.id) {
+      return;
+    }
+
+    // 現在のアクティブタブの場所を、選択した場所に切り替える（他タブにあっても独立して開ける）
     setTabs(tabs.map(t => t.id === activeTabId ? { ...t, location: item } : t));
+  };
+
+  const duplicateTab = (e: React.MouseEvent, tab: TabData) => {
+    e.stopPropagation();
+    const newTabId = crypto.randomUUID();
+    const newTab: TabData = {
+      id: newTabId,
+      location: tab.location ? { ...tab.location } : null,
+    };
+    const currentIndex = tabs.findIndex(t => t.id === tab.id);
+    const newTabs = [...tabs];
+    if (currentIndex !== -1) {
+      newTabs.splice(currentIndex + 1, 0, newTab);
+    } else {
+      newTabs.push(newTab);
+    }
+    setTabs(newTabs);
+    setActiveTabId(newTabId);
   };
 
   const closeTab = (e: React.MouseEvent, id: string) => {
@@ -679,9 +705,31 @@ export default function App() {
     reader.onload = async (ev) => {
       const text = ev.target?.result as string;
       let newItems: LocationItem[] = [];
+      let importedTabs: TabData[] | null = null;
+      let importedActiveTabId: string | null = null;
       
       if (file.name.endsWith('.json')) {
-        try { newItems = JSON.parse(text); } catch(err) { await customAlert('JSONパースエラー'); }
+        try {
+          const parsedData = JSON.parse(text);
+          if (Array.isArray(parsedData)) {
+            // 従来の配列形式JSON
+            newItems = parsedData;
+          } else if (parsedData && typeof parsedData === 'object') {
+            // タブ情報付きのバックアップ形式
+            if (Array.isArray(parsedData.locations)) {
+              newItems = parsedData.locations;
+            }
+            if (Array.isArray(parsedData.tabs)) {
+              importedTabs = parsedData.tabs;
+            }
+            if (typeof parsedData.activeTabId === 'string' || parsedData.activeTabId === null) {
+              importedActiveTabId = parsedData.activeTabId;
+            }
+          }
+        } catch(err) {
+          await customAlert('JSONパースエラー');
+          return;
+        }
       } else {
         const extracted = processBookmarksHtml(text);
         newItems = extracted.map(item => ({
@@ -691,7 +739,7 @@ export default function App() {
         }));
       }
 
-      if (newItems.length === 0) {
+      if (newItems.length === 0 && (!importedTabs || importedTabs.length === 0)) {
         await customAlert('Google マップのURLを含むブックマークか、有効なJSONが見つかりませんでした。');
         return;
       }
@@ -718,7 +766,29 @@ export default function App() {
           }
         });
 
-        customAlert(`読み込み完了！\n新規追加: ${added.length}件 / 更新: ${updatedCount}件`);
+        // タブ情報の復元
+        if (importedTabs && importedTabs.length > 0) {
+          const restoredTabs: TabData[] = importedTabs.map(t => {
+            let loc = t.location;
+            if (loc) {
+              const matched = newLocations.find(l => l.url === loc!.url || l.id === loc!.id);
+              if (matched) loc = matched;
+            }
+            return {
+              id: t.id || crypto.randomUUID(),
+              location: loc
+            };
+          });
+          setTabs(restoredTabs);
+          if (importedActiveTabId && restoredTabs.some(t => t.id === importedActiveTabId)) {
+            setActiveTabId(importedActiveTabId);
+          } else if (restoredTabs.length > 0) {
+            setActiveTabId(restoredTabs[0].id);
+          }
+        }
+
+        const tabMsg = (importedTabs && importedTabs.length > 0) ? `\n開いていたタブ: ${importedTabs.length}件を復元しました` : '';
+        customAlert(`読み込み完了！\n新規追加: ${added.length}件 / 更新: ${updatedCount}件${tabMsg}`);
         return newLocations;
       });
       e.target.value = '';
@@ -727,11 +797,22 @@ export default function App() {
   };
 
   const exportDataJson = async () => {
-    if (locations.length === 0) {
+    if (locations.length === 0 && tabs.length === 0) {
       await customAlert('エクスポートするデータがありません。');
       return;
     }
-    const dataStr = JSON.stringify(locations, null, 2);
+
+    // ブックマーク一覧に加えて、開いているタブ情報もエクスポートに含める
+    const exportPayload = {
+      version: 2,
+      type: 'streetview_backup',
+      exportedAt: new Date().toISOString(),
+      locations,
+      tabs,
+      activeTabId
+    };
+
+    const dataStr = JSON.stringify(exportPayload, null, 2);
     const blob = new Blob([dataStr], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -1461,11 +1542,20 @@ export default function App() {
                     <span className="truncate max-w-[120px]">
                       {tab.location ? tab.location.title : `TAB ${(idx + 1).toString().padStart(2, '0')}`}
                     </span>
-                    <X 
-                      size={12} 
-                      className={`opacity-50 hover:opacity-100 cursor-pointer ${activeTabId === tab.id ? 'text-white' : 'text-slate-500'}`} 
-                      onClick={(e) => closeTab(e, tab.id)} 
-                    />
+                    <div className="flex items-center gap-1.5 ml-1">
+                      <Copy 
+                        size={11} 
+                        className="opacity-40 hover:opacity-100 hover:text-cyan-400 cursor-pointer transition-all" 
+                        title="タブを複製 (コピー)" 
+                        onClick={(e) => duplicateTab(e, tab)} 
+                      />
+                      <X 
+                        size={12} 
+                        className={`opacity-50 hover:opacity-100 hover:text-rose-400 cursor-pointer transition-all ${activeTabId === tab.id ? 'text-white' : 'text-slate-500'}`} 
+                        title="タブを閉じる"
+                        onClick={(e) => closeTab(e, tab.id)} 
+                      />
+                    </div>
                   </button>
                 ))}
                 
