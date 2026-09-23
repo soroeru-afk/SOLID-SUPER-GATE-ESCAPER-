@@ -228,6 +228,42 @@ export default function App() {
   const tabRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
   const lastWheelTime = useRef<number>(0);
 
+  const [draggedTabIndex, setDraggedTabIndex] = useState<number | null>(null);
+  const [dragOverTabIndex, setDragOverTabIndex] = useState<number | null>(null);
+
+  const handleTabDragStart = (e: React.DragEvent, index: number) => {
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', index.toString());
+    setDraggedTabIndex(index);
+  };
+
+  const handleTabDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    if (dragOverTabIndex !== index) {
+      setDragOverTabIndex(index);
+    }
+  };
+
+  const handleTabDrop = (e: React.DragEvent, targetIndex: number) => {
+    e.preventDefault();
+    if (draggedTabIndex !== null && draggedTabIndex !== targetIndex) {
+      setTabs(prev => {
+        const next = [...prev];
+        const [moved] = next.splice(draggedTabIndex, 1);
+        next.splice(targetIndex, 0, moved);
+        return next;
+      });
+    }
+    setDraggedTabIndex(null);
+    setDragOverTabIndex(null);
+  };
+
+  const handleTabDragEnd = () => {
+    setDraggedTabIndex(null);
+    setDragOverTabIndex(null);
+  };
+
   const currentTabIndex = tabs.findIndex(t => t.id === activeTabId);
 
   const selectTabByIndex = (targetIndex: number) => {
@@ -1532,17 +1568,28 @@ export default function App() {
                       if (node) tabRefs.current.set(tab.id, node);
                       else tabRefs.current.delete(tab.id);
                     }}
+                    draggable
+                    onDragStart={(e) => handleTabDragStart(e, idx)}
+                    onDragOver={(e) => handleTabDragOver(e, idx)}
+                    onDrop={(e) => handleTabDrop(e, idx)}
+                    onDragEnd={handleTabDragEnd}
                     onClick={() => setActiveTabId(tab.id)}
-                    className={`flex items-center gap-2 px-3 py-1.5 border text-[10px] uppercase font-mono font-bold whitespace-nowrap transition-colors
+                    className={`flex items-center gap-2 px-3 py-1.5 border text-[10px] uppercase font-mono font-bold whitespace-nowrap transition-all cursor-grab active:cursor-grabbing select-none
+                      ${draggedTabIndex === idx ? 'opacity-30 scale-95 border-dashed border-cyan-400' : ''}
+                      ${dragOverTabIndex === idx && draggedTabIndex !== idx ? 'border-cyan-400 bg-cyan-950/50 shadow-[inset_0_0_8px_rgba(6,182,212,0.4)] ring-1 ring-cyan-400' : ''}
                       ${activeTabId === tab.id 
-                        ? 'bg-slate-800 border-slate-600 text-white' 
+                        ? 'bg-slate-800 border-slate-600 text-white shadow-sm' 
                         : 'bg-transparent border-slate-700 border-dashed text-slate-500 hover:bg-slate-800/50 hover:text-slate-300 hover:border-slate-600'
                       }`}
+                    title="クリックで選択 / ドラッグで並べ替え"
                   >
-                    <span className="truncate max-w-[120px]">
+                    <span className="truncate max-w-[120px] pointer-events-none">
                       {tab.location ? tab.location.title : `TAB ${(idx + 1).toString().padStart(2, '0')}`}
                     </span>
-                    <div className="flex items-center gap-1.5 ml-1">
+                    <div 
+                      className="flex items-center gap-1.5 ml-1"
+                      onMouseDown={(e) => e.stopPropagation()}
+                    >
                       <Copy 
                         size={11} 
                         className="opacity-40 hover:opacity-100 hover:text-cyan-400 cursor-pointer transition-all" 
