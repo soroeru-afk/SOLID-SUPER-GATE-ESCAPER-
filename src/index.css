@@ -13,6 +13,11 @@
 }
 
 /* Light Theme Overrides */
+.theme-navy {
+  --color-header-bg: #000000;
+  --color-overlay-bg: #000000;
+}
+
 .theme-light {
   --color-slate-950: #f8fafc;
   --color-slate-900: #ffffff;

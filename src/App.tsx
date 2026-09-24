@@ -503,6 +503,25 @@ export default function App() {
     };
   }, [isImmersive]);
 
+  // テーマ切り替え時にブラウザのmeta theme-colorおよびテーマ配色を連動
+  useEffect(() => {
+    let metaTheme = document.querySelector('meta[name="theme-color"]');
+    if (!metaTheme) {
+      metaTheme = document.createElement('meta');
+      metaTheme.setAttribute('name', 'theme-color');
+      document.head.appendChild(metaTheme);
+    }
+    const themeColors: Record<string, string> = {
+      navy: '#000000',
+      dark: '#0a0a0a',
+      light: '#f8fafc',
+      mocha: '#59483A',
+      latte: '#9E8668',
+    };
+    const color = themeColors[settings.theme || 'navy'] || '#000000';
+    metaTheme.setAttribute('content', color);
+  }, [settings.theme]);
+
   const toggleFullscreen = () => {
     const docEl = document.documentElement as any;
     if (!document.fullscreenElement && !docEl.webkitFullscreenElement) {
@@ -1017,7 +1036,7 @@ export default function App() {
   };
 
   return (
-    <div className={`flex bg-slate-950 text-slate-300 font-sans h-screen overflow-hidden select-none ${settings.theme === 'light' ? 'theme-light' : settings.theme === 'dark' ? 'theme-dark' : settings.theme === 'mocha' ? 'theme-mocha' : settings.theme === 'latte' ? 'theme-latte' : ''}`}>
+    <div className={`flex bg-slate-950 text-slate-300 font-sans h-screen overflow-hidden select-none theme-${settings.theme || 'navy'}`}>
       
       {/* リサイズ中のiframeマウスイベント横取り防止用透明オーバーレイ */}
       {isResizingSidebar && (
