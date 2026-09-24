@@ -381,6 +381,52 @@ export default function App() {
   const activeTab = tabs.find(t => t.id === activeTabId);
   const currentItem = activeTab?.location || null;
 
+  // === 閲覧履歴ナビゲーション（戻る・進む） ===
+  const [navHistory, setNavHistory] = useState<string[]>([]);
+  const [navHistoryIndex, setNavHistoryIndex] = useState<number>(-1);
+  const isNavigatingHistoryRef = useRef(false);
+
+  useEffect(() => {
+    if (!currentItem) return;
+    if (isNavigatingHistoryRef.current) {
+      isNavigatingHistoryRef.current = false;
+      return;
+    }
+    setNavHistory(prev => {
+      const nextHistory = prev.slice(0, navHistoryIndex + 1);
+      if (nextHistory[nextHistory.length - 1] === currentItem.id) {
+        return prev;
+      }
+      const updated = [...nextHistory, currentItem.id];
+      setNavHistoryIndex(updated.length - 1);
+      return updated;
+    });
+  }, [currentItem?.id]);
+
+  const handleNavBack = () => {
+    if (navHistoryIndex > 0) {
+      const prevLocId = navHistory[navHistoryIndex - 1];
+      const targetItem = locations.find(l => l.id === prevLocId);
+      if (targetItem) {
+        isNavigatingHistoryRef.current = true;
+        setNavHistoryIndex(navHistoryIndex - 1);
+        handleItemClick(targetItem);
+      }
+    }
+  };
+
+  const handleNavForward = () => {
+    if (navHistoryIndex < navHistory.length - 1) {
+      const nextLocId = navHistory[navHistoryIndex + 1];
+      const targetItem = locations.find(l => l.id === nextLocId);
+      if (targetItem) {
+        isNavigatingHistoryRef.current = true;
+        setNavHistoryIndex(navHistoryIndex + 1);
+        handleItemClick(targetItem);
+      }
+    }
+  };
+
   useEffect(() => {
     if (activeTabId && !tabs.find(t => t.id === activeTabId)) {
       setActiveTabId(tabs.length > 0 ? tabs[tabs.length - 1].id : null);
@@ -1176,19 +1222,36 @@ export default function App() {
                 </h1>
                 <span className="text-[10px] text-cyan-500 font-bold tracking-widest mt-1.5 leading-none">{t('viewer')}</span>
               </div>
-              <div className="flex border border-slate-700 rounded-sm overflow-hidden text-[9px] font-bold shrink-0 mb-[1px] lang-toggle-container">
-                <button 
-                  onClick={() => saveSettings({ ...settings, language: 'en' })}
-                  className={`px-1.5 py-0.5 transition-colors ${settings.language === 'en' ? 'bg-slate-400 text-slate-900' : 'bg-slate-900 text-slate-400 hover:bg-slate-800'}`}
+              <div className="flex items-center gap-1.5 shrink-0 mb-[1px]">
+                {/* UI表示・非表示トグル（目のアイコン＋UIテキスト） */}
+                <button
+                  onClick={() => setIsImmersive(!isImmersive)}
+                  className={`h-[20px] px-1.5 flex items-center gap-1 rounded-sm border transition-colors cursor-pointer text-[9px] font-bold font-mono tracking-wider ${
+                    isImmersive 
+                      ? 'border-cyan-500 bg-cyan-950/90 text-cyan-400 font-black' 
+                      : 'border-slate-700 bg-slate-900 text-slate-300 hover:text-white hover:border-slate-500'
+                  }`}
+                  title={isImmersive ? (settings.language === 'jp' ? "ヘッダーUIを表示" : "Show Header UI") : (settings.language === 'jp' ? "ヘッダーUIを非表示 (HIDE UI)" : "Hide Header UI")}
                 >
-                  EN
+                  {isImmersive ? <EyeOff size={11} className="shrink-0" /> : <Eye size={11} className="shrink-0" />}
+                  <span>UI</span>
                 </button>
-                <button 
-                  onClick={() => saveSettings({ ...settings, language: 'jp' })}
-                  className={`px-1.5 py-0.5 transition-colors ${settings.language === 'jp' ? 'bg-slate-400 text-slate-900' : 'bg-slate-900 text-slate-400 hover:bg-slate-800'}`}
-                >
-                  JP
-                </button>
+
+                {/* 言語切替トグル */}
+                <div className="h-[20px] flex items-center border border-slate-700 rounded-sm overflow-hidden text-[9px] font-bold lang-toggle-container">
+                  <button 
+                    onClick={() => saveSettings({ ...settings, language: 'en' })}
+                    className={`h-full px-1.5 flex items-center transition-colors ${settings.language === 'en' ? 'bg-slate-400 text-slate-900' : 'bg-slate-900 text-slate-400 hover:bg-slate-800'}`}
+                  >
+                    EN
+                  </button>
+                  <button 
+                    onClick={() => saveSettings({ ...settings, language: 'jp' })}
+                    className={`h-full px-1.5 flex items-center transition-colors ${settings.language === 'jp' ? 'bg-slate-400 text-slate-900' : 'bg-slate-900 text-slate-400 hover:bg-slate-800'}`}
+                  >
+                    JP
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -1225,81 +1288,111 @@ export default function App() {
               </div>
             </div>
 
-          {/* === Toolbar (透明度が素直に反映されるクリーンなスタイル) === */}
-          <div className="flex items-center justify-between text-[10px] font-mono text-slate-400 px-3 py-1.5 border-b border-slate-800/50 shrink-0">
-            <div className="flex items-center gap-2 min-w-0">
-              <span className="font-bold tracking-widest shrink-0 text-slate-300">
-                {locations.length} FILES
-              </span>
+          {/* === Toolbar (ファイル件数 ＆ 戻る・進むナビゲーション ＆ アクション) === */}
+          <div className="flex flex-col gap-1.5 px-3 py-1.5 border-b border-slate-800/50 shrink-0 font-mono text-[10px] text-slate-400">
+            {/* 上段: ファイル件数 ＆ 戻る・進むナビゲーション */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="font-bold tracking-widest text-slate-300">
+                  {locations.length} FILES
+                </span>
+              </div>
+              
+              {/* ◀ 戻る / 進む ▶ ボタン (高コントラストで透明時・全テーマで高い視認性を確保) */}
+              <div className="flex items-center h-[20px] border border-slate-600/80 bg-slate-900/85 backdrop-blur-xs rounded-sm overflow-hidden text-[9px] font-bold">
+                <button
+                  onClick={handleNavBack}
+                  disabled={navHistoryIndex <= 0}
+                  className="h-full px-2 flex items-center gap-1 hover:bg-slate-800 text-slate-100 disabled:text-slate-400/80 disabled:hover:bg-transparent transition-colors cursor-pointer disabled:cursor-not-allowed border-r border-slate-700"
+                  title={settings.language === 'jp' ? "前の場所に戻る (Back)" : "Go Back"}
+                >
+                  <span className="text-[8px]">◀</span>
+                  <span>{settings.language === 'jp' ? '戻る' : 'BACK'}</span>
+                </button>
+                <button
+                  onClick={handleNavForward}
+                  disabled={navHistoryIndex >= navHistory.length - 1}
+                  className="h-full px-2 flex items-center gap-1 hover:bg-slate-800 text-slate-100 disabled:text-slate-400/80 disabled:hover:bg-transparent transition-colors cursor-pointer disabled:cursor-not-allowed"
+                  title={settings.language === 'jp' ? "次の場所に進む (Forward)" : "Go Forward"}
+                >
+                  <span>{settings.language === 'jp' ? '進む' : 'FWD'}</span>
+                  <span className="text-[8px]">▶</span>
+                </button>
+              </div>
+            </div>
+
+            {/* 下段: 名前順ソート ＆ 選択 ＆ 展開・縮小・リフレッシュ */}
+            <div className="flex items-center justify-between">
               <button 
                 onClick={() => setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')} 
-                className="flex items-center gap-0.5 hover:text-slate-200 transition-colors whitespace-nowrap font-bold shrink-0 cursor-pointer"
+                className="flex items-center gap-0.5 hover:text-slate-200 transition-colors whitespace-nowrap font-bold cursor-pointer"
               >
                 名前順 {sortOrder === 'asc' ? '▼' : '▲'}
               </button>
-            </div>
-            <div className="flex items-center gap-1.5 shrink-0">
-              {isSelectMode && locations.length > 0 && (
-                <button
+
+              <div className="flex items-center gap-1.5 shrink-0">
+                {isSelectMode && locations.length > 0 && (
+                  <button
+                    onClick={() => {
+                      if (selectedIds.size === locations.length) {
+                        setSelectedIds(new Set());
+                      } else {
+                        setSelectedIds(new Set(locations.map(l => l.id)));
+                      }
+                    }}
+                    className="hover:text-slate-200 transition-colors text-[9px] font-bold text-slate-400 hover:underline uppercase whitespace-nowrap cursor-pointer px-1"
+                    title={selectedIds.size === locations.length ? t('deselectAll') : t('selectAll')}
+                  >
+                    {selectedIds.size === locations.length ? t('deselectAll') : t('selectAll')}
+                  </button>
+                )}
+                {isSelectMode && selectedIds.size > 0 && (
+                  <button 
+                    onClick={openSelectedInTabs}
+                    className="flex items-center gap-1 bg-cyan-600 hover:bg-cyan-500 text-black text-[9px] font-bold px-2 py-0.5 rounded-full transition-colors uppercase tracking-wider shrink-0 cursor-pointer shadow-xs"
+                    title="選択した項目をすべてタブで開く"
+                  >
+                    <FolderOpen size={10} />
+                    <span>{settings.language === 'jp' ? `タブ化 (${selectedIds.size})` : `TABS (${selectedIds.size})`}</span>
+                  </button>
+                )}
+                <button 
                   onClick={() => {
-                    if (selectedIds.size === locations.length) {
-                      setSelectedIds(new Set());
-                    } else {
-                      setSelectedIds(new Set(locations.map(l => l.id)));
-                    }
-                  }}
-                  className="hover:text-slate-200 transition-colors text-[9px] font-bold text-slate-400 hover:underline uppercase whitespace-nowrap cursor-pointer px-1"
-                  title={selectedIds.size === locations.length ? t('deselectAll') : t('selectAll')}
+                    setIsSelectMode(!isSelectMode);
+                    if (isSelectMode) setSelectedIds(new Set()); // モード切替時に選択リセット
+                  }} 
+                  className={`transition-colors whitespace-nowrap px-2.5 py-0.5 rounded-full border font-bold tracking-wider uppercase text-[10px] cursor-pointer ${
+                    isSelectMode 
+                      ? 'bg-cyan-600 border-cyan-500 text-black shadow-xs font-black' 
+                      : 'bg-slate-800/40 hover:bg-slate-800/80 hover:text-white text-slate-300 border-slate-700/60'
+                  }`}
                 >
-                  {selectedIds.size === locations.length ? t('deselectAll') : t('selectAll')}
+                  {isSelectMode ? t('selectDone') : t('select')}
                 </button>
-              )}
-              {isSelectMode && selectedIds.size > 0 && (
-                <button 
-                  onClick={openSelectedInTabs}
-                  className="flex items-center gap-1 bg-cyan-600 hover:bg-cyan-500 text-black text-[9px] font-bold px-2 py-0.5 rounded-full transition-colors uppercase tracking-wider shrink-0 cursor-pointer shadow-xs"
-                  title="選択した項目をすべてタブで開く"
-                >
-                  <FolderOpen size={10} />
-                  <span>{settings.language === 'jp' ? `タブ化 (${selectedIds.size})` : `TABS (${selectedIds.size})`}</span>
-                </button>
-              )}
-              <button 
-                onClick={() => {
-                  setIsSelectMode(!isSelectMode);
-                  if (isSelectMode) setSelectedIds(new Set()); // モード切替時に選択リセット
-                }} 
-                className={`transition-colors whitespace-nowrap px-2.5 py-0.5 rounded-full border font-bold tracking-wider uppercase text-[10px] cursor-pointer ${
-                  isSelectMode 
-                    ? 'bg-cyan-600 border-cyan-500 text-black shadow-xs font-black' 
-                    : 'bg-slate-800/40 hover:bg-slate-800/80 hover:text-white text-slate-300 border-slate-700/60'
-                }`}
-              >
-                {isSelectMode ? t('selectDone') : t('select')}
-              </button>
-              
-              <div className="flex items-center gap-1.5 ml-1">
-                <button 
-                  onClick={() => setFolderState(allFolders.reduce((acc, k) => ({...acc, [k]: true}), {}))} 
-                  className="hover:text-slate-200 text-slate-400 transition-colors cursor-pointer p-0.5" 
-                  title="すべて展開 (Expand All)"
-                >
-                  <Plus size={13} />
-                </button>
-                <button 
-                  onClick={() => setFolderState({})} 
-                  className="hover:text-slate-200 text-slate-400 transition-colors cursor-pointer p-0.5" 
-                  title="すべて折りたたむ (Collapse All)"
-                >
-                  <Minus size={13} />
-                </button>
-                <button 
-                  onClick={() => window.location.reload()} 
-                  className="hover:text-slate-200 text-slate-400 transition-colors cursor-pointer p-0.5" 
-                  title="再読み込み (Refresh)"
-                >
-                  <RotateCw size={12} />
-                </button>
+                
+                <div className="flex items-center gap-1.5 ml-1">
+                  <button 
+                    onClick={() => setFolderState(allFolders.reduce((acc, k) => ({...acc, [k]: true}), {}))} 
+                    className="hover:text-slate-200 text-slate-400 transition-colors cursor-pointer p-0.5" 
+                    title="すべて展開 (Expand All)"
+                  >
+                    <Plus size={13} />
+                  </button>
+                  <button 
+                    onClick={() => setFolderState({})} 
+                    className="hover:text-slate-200 text-slate-400 transition-colors cursor-pointer p-0.5" 
+                    title="すべて折りたたむ (Collapse All)"
+                  >
+                    <Minus size={13} />
+                  </button>
+                  <button 
+                    onClick={() => window.location.reload()} 
+                    className="hover:text-slate-200 text-slate-400 transition-colors cursor-pointer p-0.5" 
+                    title="再読み込み (Refresh)"
+                  >
+                    <RotateCw size={12} />
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -1613,21 +1706,18 @@ export default function App() {
         {/* === Main Content === */}
         <div className="flex-1 bg-black flex flex-col relative z-10 min-w-0">
           
-          {/* Header Toggle Tab */}
-          <button
-            onClick={() => setIsImmersive(!isImmersive)}
-            className="absolute left-1/2 -translate-x-1/2 z-[60] flex items-center justify-center group cursor-pointer transition-all duration-300"
-            style={{
-              height: '24px',
-              width: '100px',
-              top: isImmersive ? '0px' : '48px',
-            }}
-            title={isImmersive ? t('showUI') : t('hideUI')}
-          >
-            <div className="w-16 h-4 flex items-center justify-center bg-header-bg/40 group-hover:bg-header-bg/80 backdrop-blur-sm border border-white/10 rounded-b-lg opacity-30 group-hover:opacity-100 transition-all">
-              {isImmersive ? <ChevronDown size={14} className="text-white" /> : <ChevronUp size={14} className="text-white" />}
-            </div>
-          </button>
+          {/* Floating Show UI Handle (UIを隠した時のみ画面上部に極薄・半透明で配置、ホバー時のみ表示) */}
+          {isImmersive && (
+            <button
+              onClick={() => setIsImmersive(false)}
+              className="absolute top-0 left-1/2 -translate-x-1/2 z-[80] flex items-center justify-center group cursor-pointer h-6 w-28 opacity-20 hover:opacity-100 transition-opacity"
+              title={settings.language === 'jp' ? "UIを表示 (Escキーでも復帰可能)" : "Show UI (or press Esc)"}
+            >
+              <div className="w-16 h-3.5 flex items-center justify-center bg-slate-900/80 hover:bg-slate-800 border-x border-b border-white/20 rounded-b-md backdrop-blur-sm shadow-md">
+                <ChevronDown size={13} className="text-white/80 group-hover:text-cyan-400 transition-colors" />
+              </div>
+            </button>
+          )}
 
           {/* Floating Exit Fullscreen Button (visible only when immersive mode hides the header and we are in fullscreen) */}
           {(isImmersive && isFullscreen) && (
@@ -1734,14 +1824,6 @@ export default function App() {
                 >
                   <LayoutList size={13} />
                   <span>{mainViewMode === 'manager' ? t('viewModeViewer') : t('viewModeManager')}</span>
-                </button>
-
-                <button 
-                  onClick={() => setIsImmersive(true)}
-                  className="flex items-center gap-1 border border-white/20 hover:border-cyan-500 hover:bg-white/10 text-[10px] text-white/90 hover:text-cyan-400 font-bold px-2 py-1 rounded-md uppercase tracking-wider transition-colors shrink-0"
-                  title="UIを非表示 (Hide UI)"
-                >
-                  <EyeOff size={12} /> <span className="hidden lg:inline">HIDE UI</span>
                 </button>
 
                 {(activeTab && currentItem) ? (
