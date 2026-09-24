@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Settings, Folder, FolderOpen, File as FileIcon, X, Search, Plus, Minus, RotateCw, Trash2, Edit2, Upload, Download, Map as MapIcon, ChevronRight, ChevronLeft, ChevronsRight, ChevronsLeft, ChevronUp, ChevronDown, Menu, Check, Copy, PanelLeftClose, PanelRightClose, PanelLeftOpen, PanelRightOpen, PanelLeft, PanelRight, Maximize, Minimize, Palette, Eye, EyeOff, ExternalLink, LayoutList, GripVertical, ArrowUp, ArrowDown, Layers, Compass } from 'lucide-react';
+import { Settings, Folder, FolderOpen, Folders, File as FileIcon, X, Search, Plus, Minus, RotateCw, Trash2, Edit2, Upload, Download, Map as MapIcon, ChevronRight, ChevronLeft, ChevronsRight, ChevronsLeft, ChevronUp, ChevronDown, Menu, Check, Copy, PanelLeftClose, PanelRightClose, PanelLeftOpen, PanelRightOpen, PanelLeft, PanelRight, Maximize, Minimize, Palette, Eye, EyeOff, ExternalLink, LayoutList, GripVertical, ArrowUp, ArrowDown, Layers, Compass } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { LinkManagerView } from './components/LinkManagerView';
 
@@ -31,6 +31,7 @@ interface AppSettings {
   folderIconColor?: string;
   sidebarOpacity?: number;
   sidebarFontSize?: number;
+  listFontSize?: number;
 }
 
 interface TabData {
@@ -83,6 +84,7 @@ const translations = {
     showUI: 'ヘッダーを表示',
     sidebarOpacity: 'サイドバー透明度',
     sidebarFontSize: 'サイドバー文字サイズ',
+    listFontSize: 'リスト文字サイズ',
     select: '選択',
     selectDone: '完了',
     selectAll: '全選択',
@@ -138,6 +140,7 @@ const translations = {
     showUI: 'Show UI',
     sidebarOpacity: 'Sidebar Opacity',
     sidebarFontSize: 'Sidebar Font Size',
+    listFontSize: 'List Font Size',
     select: 'SELECT',
     selectDone: 'DONE',
     selectAll: 'SELECT ALL',
@@ -235,6 +238,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   folderIconColor: '#06b6d4',
   sidebarOpacity: 1.0,
   sidebarFontSize: 12,
+  listFontSize: 12,
 };
 
 // === Main App Component ===
@@ -502,6 +506,49 @@ export default function App() {
   const [managerSearch, setManagerSearch] = useState('');
   const [draggedManagerId, setDraggedManagerId] = useState<string | null>(null);
 
+  // サイドバー親カテゴリーの並び替え状態 (localStorageで永続化)
+  const [parentFolderOrder, setParentFolderOrder] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem('knav_parent_folder_order');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+  const [draggedParentFolder, setDraggedParentFolder] = useState<string | null>(null);
+  const [dragOverParentFolder, setDragOverParentFolder] = useState<string | null>(null);
+
+  // サイドバー親カテゴリーのドロップ処理
+  const handleParentFolderDrop = (targetParent: string) => {
+    if (!draggedParentFolder || draggedParentFolder === targetParent) {
+      setDraggedParentFolder(null);
+      setDragOverParentFolder(null);
+      return;
+    }
+
+    // 現在の親フォルダ順序リストを取得
+    const currentOrder = hierarchicalFolders.map(p => p.name);
+    const fromIndex = currentOrder.indexOf(draggedParentFolder);
+    const toIndex = currentOrder.indexOf(targetParent);
+    if (fromIndex === -1 || toIndex === -1) {
+      setDraggedParentFolder(null);
+      setDragOverParentFolder(null);
+      return;
+    }
+
+    const newOrder = [...currentOrder];
+    const [moved] = newOrder.splice(fromIndex, 1);
+    newOrder.splice(toIndex, 0, moved);
+
+    setParentFolderOrder(newOrder);
+    try {
+      localStorage.setItem('knav_parent_folder_order', JSON.stringify(newOrder));
+    } catch {}
+
+    setDraggedParentFolder(null);
+    setDragOverParentFolder(null);
+  };
+
   // マネージャー内でのアイテム上下並び替え関数
   const moveItemOrder = (itemId: string, direction: 'up' | 'down') => {
     const currentIndex = locations.findIndex(loc => loc.id === itemId);
@@ -598,6 +645,15 @@ export default function App() {
     }
     if ((raw as any) === 'sm') return 11;
     if ((raw as any) === 'lg') return 14;
+    return 12;
+  };
+
+  // リスト文字サイズ計算 (数値px: 10px〜22px、デフォルト12px)
+  const getListFontSizePx = (): number => {
+    const raw = settings.listFontSize;
+    if (typeof raw === 'number' && !isNaN(raw)) {
+      return Math.max(9, Math.min(24, raw));
+    }
     return 12;
   };
 
@@ -756,25 +812,6 @@ export default function App() {
     }
   }, [tabs, activeTabId]);
 
-  // Dynamic theme-color meta tag sync (Solid series standard: synchronized to Sidebar Header background)
-  useEffect(() => {
-    const themeHeaderColors: Record<string, string> = {
-      navy: '#000000',
-      dark: '#14171d',
-      light: '#ffffff',
-      mocha: '#59483A',
-      latte: '#9E8668',
-    };
-    const currentColor = themeHeaderColors[settings.theme || 'navy'] || '#000000';
-    let metaTag = document.querySelector('meta[name="theme-color"]');
-    if (!metaTag) {
-      metaTag = document.createElement('meta');
-      metaTag.setAttribute('name', 'theme-color');
-      document.head.appendChild(metaTag);
-    }
-    metaTag.setAttribute('content', currentColor);
-  }, [settings.theme]);
-
   // Save changes
   const saveLocations = (newLocs: LocationItem[]) => {
     setLocations(newLocs);
@@ -789,6 +826,25 @@ export default function App() {
       localStorage.setItem('sv_settings', JSON.stringify(newSettings));
     } catch(e) {}
   };
+
+  // Update browser theme-color meta tag dynamically based on the current theme
+  useEffect(() => {
+    const themeColors = {
+      navy: '#000000',
+      dark: '#000000',
+      light: '#f8fafc',
+      mocha: '#59483A',
+      latte: '#9E8668',
+    };
+    const color = themeColors[settings.theme] || '#000000';
+    let meta = document.querySelector('meta[name="theme-color"]');
+    if (!meta) {
+      meta = document.createElement('meta');
+      meta.setAttribute('name', 'theme-color');
+      document.head.appendChild(meta);
+    }
+    meta.setAttribute('content', color);
+  }, [settings.theme]);
 
   // Sync Tampermonkey
   useEffect(() => {
@@ -896,12 +952,21 @@ export default function App() {
       }
     });
 
-    // ソート
-    return Object.values(parents).sort((a, b) => a.name.localeCompare(b.name)).map(p => {
+    // ソート（ドラッグ＆ドロップによるカスタム順序があればそれを優先、なければ五十音/アルファベット順）
+    const sortedParents = Object.values(parents).sort((a, b) => {
+      const idxA = parentFolderOrder.indexOf(a.name);
+      const idxB = parentFolderOrder.indexOf(b.name);
+      if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+      if (idxA !== -1) return -1;
+      if (idxB !== -1) return 1;
+      return a.name.localeCompare(b.name);
+    });
+
+    return sortedParents.map(p => {
       p.subGroups.sort((a, b) => a.subName.localeCompare(b.subName));
       return p;
     });
-  }, [folderGroups]);
+  }, [folderGroups, parentFolderOrder]);
 
   // Handlers
   const toggleFolder = (folderName: string) => {
@@ -1181,7 +1246,7 @@ export default function App() {
   };
 
   return (
-    <div className={`flex bg-slate-950 text-slate-300 font-sans h-screen overflow-hidden select-none theme-${settings.theme || 'navy'}`}>
+    <div className={`flex bg-slate-950 text-slate-300 font-sans h-screen overflow-hidden select-none ${settings.theme === 'light' ? 'theme-light' : settings.theme === 'dark' ? 'theme-dark' : settings.theme === 'mocha' ? 'theme-mocha' : settings.theme === 'latte' ? 'theme-latte' : ''}`}>
       
       {/* リサイズ中のiframeマウスイベント横取り防止用透明オーバーレイ */}
       {isResizingSidebar && (
@@ -1399,6 +1464,28 @@ export default function App() {
 
           {/* List Area */}
           <div className="flex-1 overflow-y-auto p-2 font-mono text-sm scrollbar-thin">
+            {/* 最上部: K-Navigator風 [ ALL DATA ] カード */}
+            <div className="mb-2">
+              <button
+                onClick={() => {
+                  setMainViewMode('manager');
+                  setManagerFolder(null);
+                }}
+                className="w-full flex items-center justify-between px-2 py-1.5 rounded-sm border border-slate-700/60 bg-transparent hover:bg-slate-800/60 hover:border-slate-500/80 text-slate-200 hover:text-white transition-all cursor-pointer group"
+                title="リスト管理（全件表示）を開く"
+              >
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <Folders size={14} className="text-slate-400 group-hover:text-cyan-400 transition-colors shrink-0 ml-0.5" />
+                  <span className="font-bold uppercase tracking-wider text-xs truncate">
+                    [ ALL DATA ]
+                  </span>
+                </div>
+                <span className="text-[9px] bg-slate-800/80 border border-slate-700/60 text-slate-300 font-bold px-1.5 py-0.5 rounded-sm shrink-0 mr-1">
+                  {locations.length}
+                </span>
+              </button>
+            </div>
+
             {locations.length === 0 ? (
               <div className="text-center p-8 text-xs text-slate-500 leading-relaxed whitespace-pre-line">
                 {t('emptyLoc1')}<br/>{t('emptyLoc2')}
@@ -1412,11 +1499,49 @@ export default function App() {
                 const fs = getSidebarFontSizePx();
                 return hierarchicalFolders.map(parent => {
                   const isParentOpen = searchQuery ? true : !!folderState[parent.name];
+                  const isDragOver = dragOverParentFolder === parent.name;
+                  const isDragging = draggedParentFolder === parent.name;
                   
                   return (
-                    <div key={parent.name} className="mb-2">
+                    <div 
+                      key={parent.name} 
+                      className={`mb-2 transition-all ${isDragOver ? 'border-t-2 border-cyan-400 pt-1' : ''} ${isDragging ? 'opacity-40' : ''}`}
+                      onDragOver={(e) => {
+                        e.preventDefault();
+                        if (dragOverParentFolder !== parent.name) {
+                          setDragOverParentFolder(parent.name);
+                        }
+                      }}
+                      onDragLeave={() => {
+                        if (dragOverParentFolder === parent.name) {
+                          setDragOverParentFolder(null);
+                        }
+                      }}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        handleParentFolderDrop(parent.name);
+                      }}
+                    >
                       {/* 親フォルダ */}
                       <div className="flex items-center group relative p-1 rounded-sm transition-colors hover:bg-slate-800/60">
+                        {/* ドラッグハンドル (K-Navigator風 GripVertical) */}
+                        <div 
+                          draggable
+                          onDragStart={(e) => {
+                            e.stopPropagation();
+                            e.dataTransfer.setData('text/plain', parent.name);
+                            setDraggedParentFolder(parent.name);
+                          }}
+                          onDragEnd={() => {
+                            setDraggedParentFolder(null);
+                            setDragOverParentFolder(null);
+                          }}
+                          className="cursor-grab active:cursor-grabbing text-slate-500 hover:text-slate-200 p-0.5 mr-0.5 shrink-0 transition-colors" 
+                          title="ドラッグしてカテゴリーを移動・並べ替え"
+                        >
+                          <GripVertical size={13} />
+                        </div>
+
                         <button 
                           className="flex-1 flex items-center text-slate-200 hover:text-white transition-colors text-left min-w-0"
                           onClick={() => toggleFolder(parent.name)}
@@ -1674,11 +1799,7 @@ export default function App() {
             {/* リストマネージャー画面を開くボタン */}
             <button 
               onClick={() => setMainViewMode(prev => prev === 'viewer' ? 'manager' : 'viewer')}
-              className={`w-full flex justify-center items-center gap-2 text-xs font-bold py-1.5 rounded-md border transition-all uppercase tracking-wider ${
-                mainViewMode === 'manager' 
-                  ? 'bg-cyan-950/80 border-cyan-500 text-cyan-300 shadow-[0_0_8px_rgba(6,182,212,0.3)]' 
-                  : 'bg-slate-800/80 hover:bg-slate-700 text-slate-200 border-slate-700 hover:border-slate-600'
-              }`}
+              className="w-full flex justify-center items-center gap-2 text-xs font-bold py-1.5 rounded-md border transition-all uppercase tracking-wider bg-slate-800/80 hover:bg-slate-700 text-slate-200 border-slate-700 hover:border-slate-600"
             >
               <LayoutList size={14} className="text-cyan-400" />
               <span>{mainViewMode === 'manager' ? (settings.language === 'jp' ? "ビューアに戻る" : "BACK TO VIEWER") : (settings.language === 'jp' ? "リストマネージャー" : "LIST MANAGER")}</span>
@@ -1733,7 +1854,7 @@ export default function App() {
           {/* Header Area (always visible to maintain height) */}
           {!isImmersive && (
             <div 
-              className="h-12 border-b border-slate-800 bg-header-bg/80 backdrop-blur-md flex items-center justify-between shrink-0 z-20 relative flex-nowrap overflow-hidden px-3 sm:px-4"
+              className="h-12 border-b border-slate-800 bg-header-bg/80 backdrop-blur-md flex items-center justify-between shrink-0 z-20 relative flex-nowrap overflow-hidden px-3 sm:px-4 location-header-bar"
               style={{ 
                 marginRight: (isSidebarOpen && settings.sidebarPosition === 'right') ? `${settings.sidebarWidth}px` : '0px',
                 marginLeft: (isSidebarOpen && settings.sidebarPosition === 'left') ? `${settings.sidebarWidth}px` : '0px',
@@ -1831,14 +1952,14 @@ export default function App() {
                     href={currentItem.url} 
                     target="_blank" 
                     rel="noreferrer"
-                    className="flex items-center gap-1 bg-transparent border border-white/40 hover:border-white hover:bg-white/10 text-white font-bold text-[10px] px-2 py-1 rounded-md uppercase tracking-wider transition-colors open-map-btn shrink-0"
+                    className="flex items-center gap-1 bg-transparent border border-white/20 hover:border-cyan-500 hover:bg-white/10 text-white/90 hover:text-cyan-400 font-bold text-[10px] px-2 py-1 rounded-md uppercase tracking-wider transition-colors open-map-btn shrink-0"
                   >
                     <MapIcon size={12} /> <span className="hidden lg:inline">{t('openMap')}</span>
                   </a>
                 ) : (
                   <button 
                     disabled
-                    className="flex items-center gap-1 bg-transparent border border-slate-800 text-slate-600 font-bold text-[10px] px-2 py-1 rounded-md uppercase tracking-wider cursor-not-allowed shrink-0"
+                    className="flex items-center gap-1 bg-transparent border border-white/20 text-white/90 font-bold text-[10px] px-2 py-1 rounded-md uppercase tracking-wider cursor-not-allowed shrink-0"
                   >
                     <MapIcon size={12} /> <span className="hidden lg:inline">{t('openMap')}</span>
                   </button>
@@ -2044,6 +2165,16 @@ export default function App() {
               <LinkManagerView
                 locations={locations}
                 allFolders={allFolders}
+                initialFolder={managerFolder}
+                parentFolderOrder={parentFolderOrder}
+                onReorderParentFolders={(newOrder) => {
+                  setParentFolderOrder(newOrder);
+                  try {
+                    localStorage.setItem('knav_parent_folder_order', JSON.stringify(newOrder));
+                  } catch {}
+                }}
+                listFontSize={getListFontSizePx()}
+                onUpdateListFontSize={(size) => saveSettings({ ...settings, listFontSize: size })}
                 theme={settings.theme}
                 onSelectLocation={(loc) => {
                   handleItemClick(loc);
@@ -2280,6 +2411,29 @@ export default function App() {
                     <span>10px (小)</span>
                     <span>12px (標準)</span>
                     <span>18px (大)</span>
+                  </div>
+                </div>
+
+                <div>
+                  <div className="flex justify-between items-center mb-2">
+                    <label className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">
+                      {t('listFontSize')}
+                    </label>
+                    <span className="text-xs font-mono font-bold text-cyan-400">{getListFontSizePx()}PX</span>
+                  </div>
+                  <input 
+                    type="range" 
+                    min="10" 
+                    max="20" 
+                    step="1"
+                    value={getListFontSizePx()} 
+                    onChange={(e) => saveSettings({ ...settings, listFontSize: Number(e.target.value) })}
+                    className="w-full solid-square-slider"
+                  />
+                  <div className="flex justify-between text-[9px] text-slate-500 font-mono mt-1">
+                    <span>10px (小)</span>
+                    <span>12px (標準)</span>
+                    <span>20px (大)</span>
                   </div>
                 </div>
 

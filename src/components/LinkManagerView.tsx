@@ -30,6 +30,9 @@ export interface LocationItem {
 interface LinkManagerViewProps {
   locations: LocationItem[];
   allFolders: string[];
+  initialFolder?: string | null;
+  parentFolderOrder?: string[];
+  onReorderParentFolders?: (newOrder: string[]) => void;
   theme?: string;
   onSelectLocation: (loc: LocationItem) => void;
   onOpenInNewTab: (loc: LocationItem) => void;
@@ -44,12 +47,19 @@ interface LinkManagerViewProps {
   onDeleteFolder: (folderName: string) => void;
   onAddLocation: () => void;
   onCloseManager: () => void;
+  listFontSize?: number;
+  onUpdateListFontSize?: (size: number) => void;
   language: 'jp' | 'en';
 }
 
 export const LinkManagerView: React.FC<LinkManagerViewProps> = ({
   locations,
   allFolders,
+  initialFolder = null,
+  parentFolderOrder = [],
+  onReorderParentFolders,
+  listFontSize = 12,
+  onUpdateListFontSize,
   onSelectLocation,
   onOpenInNewTab,
   onEditLocation,
@@ -65,7 +75,57 @@ export const LinkManagerView: React.FC<LinkManagerViewProps> = ({
   onCloseManager,
   language,
 }) => {
-  const [selectedFolder, setSelectedFolder] = useState<string | null>(null);
+  // 階層ナビゲーション状態: 親フォルダ (第1階層) と 子フォルダ (第2階層)
+  const [selectedParent, setSelectedParent] = useState<string | null>(() => {
+    if (!initialFolder) return null;
+    const parts = initialFolder.split(' / ');
+    return parts[0].trim();
+  });
+  const [selectedSub, setSelectedSub] = useState<string | null>(() => {
+    if (!initialFolder) return null;
+    const parts = initialFolder.split(' / ');
+    return parts.length > 1 ? initialFolder : null;
+  });
+
+  // カテゴリカードのドラッグ＆ドロップ並び替え状態
+  const [draggedCardParent, setDraggedCardParent] = useState<string | null>(null);
+  const [dragOverCardParent, setDragOverCardParent] = useState<string | null>(null);
+
+  const handleCardParentDrop = (targetParent: string) => {
+    if (!draggedCardParent || draggedCardParent === targetParent || !onReorderParentFolders) {
+      setDraggedCardParent(null);
+      setDragOverCardParent(null);
+      return;
+    }
+    const currentOrder = hierarchicalData.map(p => p.name);
+    const fromIndex = currentOrder.indexOf(draggedCardParent);
+    const toIndex = currentOrder.indexOf(targetParent);
+    if (fromIndex === -1 || toIndex === -1) {
+      setDraggedCardParent(null);
+      setDragOverCardParent(null);
+      return;
+    }
+    const newOrder = [...currentOrder];
+    const [moved] = newOrder.splice(fromIndex, 1);
+    newOrder.splice(toIndex, 0, moved);
+    onReorderParentFolders(newOrder);
+    setDraggedCardParent(null);
+    setDragOverCardParent(null);
+  };
+
+  // initialFolder の外部変更検知
+  useEffect(() => {
+    if (initialFolder === undefined) return;
+    if (initialFolder === null) {
+      setSelectedParent(null);
+      setSelectedSub(null);
+    } else {
+      const parts = initialFolder.split(' / ');
+      setSelectedParent(parts[0].trim());
+      setSelectedSub(parts.length > 1 ? initialFolder : null);
+    }
+  }, [initialFolder]);
+
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [draggedId, setDraggedId] = useState<string | null>(null);
@@ -137,12 +197,73 @@ export const LinkManagerView: React.FC<LinkManagerViewProps> = ({
     return counts;
   }, [locations]);
 
+  // フォルダ階層データの構築（第1階層の親フォルダと配下のサブフォルダ）
+  const hierarchicalData = useMemo(() => {
+    const parentMap = new Map<string, {
+      name: string;
+      totalCount: number;
+      directCount: number;
+      subFolders: { name: string; fullName: string; count: number }[];
+    }>();
+
+    for (const folder of allFolders) {
+      const parts = folder.split(' / ');
+      const parentName = parts[0].trim();
+      if (!parentMap.has(parentName)) {
+        parentMap.set(parentName, {
+          name: parentName,
+          totalCount: 0,
+          directCount: 0,
+          subFolders: [],
+        });
+      }
+      const info = parentMap.get(parentName)!;
+      const count = folderCounts[folder] || 0;
+      if (parts.length > 1) {
+        const subName = parts.slice(1).join(' / ').trim();
+        info.subFolders.push({
+          name: subName,
+          fullName: folder,
+          count,
+        });
+        info.totalCount += count;
+      } else {
+        info.directCount += count;
+        info.totalCount += count;
+      }
+    }
+
+    const list = Array.from(parentMap.values());
+    // サイドバーのドラッグ＆ドロップ順序 (parentFolderOrder) を即座に反映！
+    list.sort((a, b) => {
+      const idxA = parentFolderOrder.indexOf(a.name);
+      const idxB = parentFolderOrder.indexOf(b.name);
+      if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+      if (idxA !== -1) return -1;
+      if (idxB !== -1) return 1;
+      return a.name.localeCompare(b.name);
+    });
+    list.forEach(p => p.subFolders.sort((a, b) => a.name.localeCompare(b.name)));
+    return list;
+  }, [allFolders, folderCounts, parentFolderOrder]);
+
+  const currentParentInfo = useMemo(() => {
+    if (!selectedParent) return null;
+    return hierarchicalData.find(p => p.name === selectedParent) || null;
+  }, [hierarchicalData, selectedParent]);
+
   // フィルタリングされたアイテムリスト
   const filteredItems = useMemo(() => {
     let list = locations;
-    if (selectedFolder !== null) {
-      list = list.filter(loc => (loc.folderName || 'Unassigned') === selectedFolder);
+    if (selectedSub) {
+      list = list.filter(loc => (loc.folderName || 'Unassigned') === selectedSub);
+    } else if (selectedParent) {
+      list = list.filter(loc => {
+        const f = loc.folderName || 'Unassigned';
+        return f === selectedParent || f.startsWith(`${selectedParent} / `);
+      });
     }
+
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
       list = list.filter(loc => 
@@ -152,7 +273,7 @@ export const LinkManagerView: React.FC<LinkManagerViewProps> = ({
       );
     }
     return list;
-  }, [locations, selectedFolder, searchQuery]);
+  }, [locations, selectedParent, selectedSub, searchQuery]);
 
   // 全選択 / 解除
   const toggleSelectAll = () => {
@@ -323,27 +444,38 @@ export const LinkManagerView: React.FC<LinkManagerViewProps> = ({
 
   // フォルダ名変更
   const handleRenameCurrentFolder = () => {
-    if (!selectedFolder) return;
+    const targetFolder = selectedSub || selectedParent;
+    if (!targetFolder) return;
     const newName = window.prompt(
-      language === 'jp' ? `「${selectedFolder}」の新しいフォルダ名を入力してください` : `Enter new name for "${selectedFolder}"`,
-      selectedFolder
+      language === 'jp' ? `「${targetFolder}」の新しいフォルダ名を入力してください` : `Enter new name for "${targetFolder}"`,
+      targetFolder
     );
-    if (newName && newName.trim() && newName.trim() !== selectedFolder) {
-      onRenameFolder(selectedFolder, newName.trim());
-      setSelectedFolder(newName.trim());
+    if (newName && newName.trim() && newName.trim() !== targetFolder) {
+      onRenameFolder(targetFolder, newName.trim());
+      if (selectedSub) {
+        setSelectedSub(newName.trim());
+      } else {
+        setSelectedParent(newName.trim());
+      }
     }
   };
 
   // フォルダ削除
   const handleDeleteCurrentFolder = () => {
-    if (!selectedFolder) return;
+    const targetFolder = selectedSub || selectedParent;
+    if (!targetFolder) return;
+    const count = selectedSub ? (folderCounts[selectedSub] || 0) : (currentParentInfo?.totalCount || 0);
     if (window.confirm(
       language === 'jp' 
-        ? `フォルダ「${selectedFolder}」および含まれるすべての場所 (${folderCounts[selectedFolder] || 0} 件) を削除しますか？`
-        : `Delete folder "${selectedFolder}" and all its ${folderCounts[selectedFolder] || 0} locations?`
+        ? `フォルダ「${targetFolder}」および含まれるすべての場所 (${count} 件) を削除しますか？`
+        : `Delete folder "${targetFolder}" and all its ${count} locations?`
     )) {
-      onDeleteFolder(selectedFolder);
-      setSelectedFolder(null);
+      onDeleteFolder(targetFolder);
+      if (selectedSub) {
+        setSelectedSub(null);
+      } else {
+        setSelectedParent(null);
+      }
     }
   };
 
@@ -369,28 +501,57 @@ export const LinkManagerView: React.FC<LinkManagerViewProps> = ({
             </div>
           </div>
 
-          {/* パンくずナビゲーション */}
-          <div className="hidden md:flex items-center gap-2 ml-4 pl-4 border-l border-slate-700/60 text-xs font-mono min-w-0 text-slate-400">
+          {/* パンくずナビゲーション (BREADCRUMBS) */}
+          <div className="hidden md:flex items-center gap-1.5 ml-4 pl-4 border-l border-slate-700/60 text-xs font-mono min-w-0 text-slate-400">
             <span className="font-bold uppercase shrink-0 text-slate-400">CURRENT DIR:</span>
+            
+            {/* ルート: [ ALL DATA ] */}
             <button 
-              onClick={() => setSelectedFolder(null)}
+              onClick={() => {
+                setSelectedParent(null);
+                setSelectedSub(null);
+              }}
               className={`hover:underline font-black transition-colors shrink-0 cursor-pointer ${
-                selectedFolder === null ? 'text-cyan-600 dark:text-cyan-400 underline' : 'text-slate-300'
+                selectedParent === null ? 'text-cyan-600 dark:text-cyan-400 underline' : 'text-slate-300'
               }`}
             >
               [ ALL DATA ]
             </button>
-            {selectedFolder && (
-              <>
-                <ChevronRight size={14} className="text-slate-600" />
-                <span className="font-bold px-2 py-0.5 rounded truncate max-w-[200px] border border-cyan-500/40 bg-cyan-500/20 text-white">
-                  {selectedFolder}
-                </span>
 
-                {/* フォルダ操作ボタン */}
+            {/* 第1階層: 親フォルダ */}
+            {selectedParent && (
+              <>
+                <ChevronRight size={14} className="text-slate-600 shrink-0" />
+                <button
+                  onClick={() => setSelectedSub(null)}
+                  className={`font-bold px-2 py-0.5 rounded truncate max-w-[220px] border transition-colors cursor-pointer ${
+                    selectedSub === null
+                      ? 'border-cyan-500/40 bg-cyan-500/20 text-white font-black'
+                      : 'border-slate-700 bg-slate-900/60 text-slate-300 hover:border-slate-500 hover:text-white'
+                  }`}
+                  title={selectedParent}
+                >
+                  {selectedParent}
+                </button>
+              </>
+            )}
+
+            {/* 第2階層: 子フォルダ */}
+            {selectedSub && (
+              <>
+                <ChevronRight size={14} className="text-slate-600 shrink-0" />
+                <span className="font-black px-2 py-0.5 rounded truncate max-w-[240px] border border-cyan-500/40 bg-cyan-500/20 text-white" title={selectedSub}>
+                  {selectedSub.split(' / ').slice(1).join(' / ') || selectedSub}
+                </span>
+              </>
+            )}
+
+            {/* フォルダ操作ボタン（名前変更・削除） */}
+            {(selectedParent || selectedSub) && (
+              <div className="flex items-center gap-1 ml-1 shrink-0">
                 <button
                   onClick={handleRenameCurrentFolder}
-                  className="flex items-center gap-1 text-[11px] px-2 py-0.5 rounded transition-colors shrink-0 ml-1 border border-slate-700 hover:bg-slate-800 text-slate-300 cursor-pointer"
+                  className="flex items-center gap-1 text-[11px] px-2 py-0.5 rounded transition-colors shrink-0 border border-slate-700 hover:bg-slate-800 text-slate-300 cursor-pointer"
                   title="フォルダ名を変更"
                 >
                   <FolderEdit size={12} />
@@ -404,7 +565,7 @@ export const LinkManagerView: React.FC<LinkManagerViewProps> = ({
                   <FolderMinus size={12} />
                   <span>{language === 'jp' ? "フォルダ削除" : "DELETE"}</span>
                 </button>
-              </>
+              </div>
             )}
           </div>
         </div>
@@ -441,101 +602,207 @@ export const LinkManagerView: React.FC<LinkManagerViewProps> = ({
         </div>
       </div>
 
-      {/* === 2. SUB-DIRECTORIES (Kナビゲーター風 等幅グリッド) === */}
+      {/* === 2. SUB-DIRECTORIES (Kナビゲーター風 階層連動グリッド) === */}
       <div className="px-5 py-3 border-b border-slate-800 bg-slate-900/60 shrink-0 transition-colors">
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2 text-xs font-mono uppercase tracking-wider text-slate-400 font-bold">
             <Folder size={14} className="text-cyan-600 dark:text-cyan-400" />
-            <span>CATEGORIES ({allFolders.length + 1})</span>
+            <span>
+              {selectedParent === null 
+                ? `CATEGORIES (${hierarchicalData.length})` 
+                : `CATEGORIES : ${selectedParent} (${(currentParentInfo?.subFolders.length || 0) + (currentParentInfo?.directCount ? 1 : 0)})`
+              }
+            </span>
           </div>
-          {selectedFolder && (
+          {selectedParent && (
             <button
-              onClick={() => setSelectedFolder(null)}
-              className="text-[10px] font-mono underline font-black text-cyan-600 dark:text-cyan-400 hover:opacity-80 cursor-pointer"
+              onClick={() => {
+                setSelectedParent(null);
+                setSelectedSub(null);
+              }}
+              className="text-[10px] font-mono underline font-black text-cyan-600 dark:text-cyan-400 hover:opacity-80 cursor-pointer flex items-center gap-1"
             >
-              {language === 'jp' ? "すべてのフォルダを表示" : "Show All Folders"}
+              <span>← {language === 'jp' ? "トップ階層に戻る" : "Back to Top Categories"}</span>
             </button>
           )}
         </div>
 
-        {/* 等幅グリッド配置（黒文字・高コントラスト対応） */}
+        {/* 等幅グリッド配置 */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 max-h-36 overflow-y-auto pr-1">
-          {/* [ ALL DATA ] 全件表示カード */}
-          <button
-            onClick={() => setSelectedFolder(null)}
-            className={`flex items-center justify-between px-3 py-2 rounded border text-xs font-mono transition-all cursor-pointer shadow-xs ${
-              selectedFolder === null
-                ? 'bg-cyan-500 border-cyan-400 text-slate-950 font-black ring-2 ring-cyan-500/30'
-                : 'bg-slate-900 border-slate-800 hover:border-slate-700 text-slate-300 hover:bg-slate-800/80'
-            }`}
-          >
-            <div className="flex items-center gap-2 min-w-0">
-              <Database size={14} className={selectedFolder === null ? 'text-slate-950' : 'text-slate-400'} />
-              <span className="font-black truncate">[ ALL DATA ]</span>
-            </div>
-            <span className={`ml-2 px-2 py-0.5 rounded text-[11px] font-mono font-black shrink-0 border ${
-              selectedFolder === null
-                ? 'bg-slate-950 text-white border-slate-800'
-                : 'bg-slate-800 text-slate-300 border-slate-700/60'
-            }`}>
-              {locations.length}
-            </span>
-          </button>
-
-          {/* 各フォルダカード */}
-          {allFolders.map(folder => {
-            const count = folderCounts[folder] || 0;
-            const isSelected = selectedFolder === folder;
-            return (
+          {selectedParent === null ? (
+            /* [トップ階層] [ ALL DATA ] + 第1階層の親フォルダカード (8個のみ) */
+            <>
+              {/* [ ALL DATA ] 全件表示カード */}
               <button
-                key={folder}
-                onClick={() => setSelectedFolder(isSelected ? null : folder)}
+                onClick={() => {
+                  setSelectedParent(null);
+                  setSelectedSub(null);
+                }}
+                className="flex items-center justify-between px-3 py-2 rounded border text-xs font-mono transition-all cursor-pointer shadow-xs bg-cyan-500 border-cyan-400 text-slate-950 font-black ring-2 ring-cyan-500/30"
+              >
+                <div className="flex items-center gap-2 min-w-0">
+                  <Database size={14} className="text-slate-950" />
+                  <span className="font-black truncate">[ ALL DATA ]</span>
+                </div>
+                <span className="ml-2 px-2 py-0.5 rounded text-[11px] font-mono font-black shrink-0 border bg-slate-950 text-white border-slate-800">
+                  {locations.length}
+                </span>
+              </button>
+
+              {/* 第1階層親フォルダ (8個) */}
+              {hierarchicalData.map(parent => {
+                const isDragOver = dragOverCardParent === parent.name;
+                const isDragging = draggedCardParent === parent.name;
+                return (
+                  <button
+                    key={parent.name}
+                    draggable
+                    onDragStart={(e) => {
+                      e.dataTransfer.setData('text/plain', parent.name);
+                      setDraggedCardParent(parent.name);
+                    }}
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      if (dragOverCardParent !== parent.name) {
+                        setDragOverCardParent(parent.name);
+                      }
+                    }}
+                    onDragLeave={() => {
+                      if (dragOverCardParent === parent.name) {
+                        setDragOverCardParent(null);
+                      }
+                    }}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      handleCardParentDrop(parent.name);
+                    }}
+                    onDragEnd={() => {
+                      setDraggedCardParent(null);
+                      setDragOverCardParent(null);
+                    }}
+                    onClick={() => {
+                      setSelectedParent(parent.name);
+                      setSelectedSub(null);
+                    }}
+                    className={`flex items-center justify-between px-3 py-2 rounded border text-xs font-mono transition-all cursor-pointer shadow-xs bg-slate-900 border-slate-800 hover:border-cyan-500/50 hover:bg-slate-800/90 text-slate-300 hover:text-white ${
+                      isDragOver ? 'ring-2 ring-cyan-400 border-cyan-400' : ''
+                    } ${isDragging ? 'opacity-40' : ''}`}
+                    title="クリックで開く / ドラッグでカテゴリー並べ替え"
+                  >
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <GripVertical size={12} className="text-slate-500 shrink-0 cursor-grab" />
+                      <Folder size={14} className="text-slate-400 shrink-0" />
+                      <span className="font-bold truncate" title={parent.name}>{parent.name}</span>
+                    </div>
+                    <span className="ml-2 px-2 py-0.5 rounded text-[11px] font-mono font-black shrink-0 border bg-slate-800 text-slate-300 border-slate-700/60">
+                      {parent.totalCount}
+                    </span>
+                  </button>
+                );
+              })}
+            </>
+          ) : (
+            /* [親フォルダ選択時] [ 親フォルダ すべて ] + その親に属するサブフォルダカード */
+            <>
+              {/* [ 親フォルダ すべて ] カード */}
+              <button
+                onClick={() => setSelectedSub(null)}
                 className={`flex items-center justify-between px-3 py-2 rounded border text-xs font-mono transition-all cursor-pointer shadow-xs ${
-                  isSelected
+                  selectedSub === null
                     ? 'bg-cyan-500 border-cyan-400 text-slate-950 font-black ring-2 ring-cyan-500/30'
                     : 'bg-slate-900 border-slate-800 hover:border-slate-700 text-slate-300 hover:bg-slate-800/80'
                 }`}
               >
                 <div className="flex items-center gap-2 min-w-0">
-                  <Folder size={14} className={isSelected ? 'text-slate-950' : 'text-slate-400'} />
-                  <span className="font-black truncate" title={folder}>{folder}</span>
+                  <FolderOpen size={14} className={selectedSub === null ? 'text-slate-950' : 'text-slate-400'} />
+                  <span className="font-black truncate">[ {selectedParent} すべて ]</span>
                 </div>
                 <span className={`ml-2 px-2 py-0.5 rounded text-[11px] font-mono font-black shrink-0 border ${
-                  isSelected
+                  selectedSub === null
                     ? 'bg-slate-950 text-white border-slate-800'
                     : 'bg-slate-800 text-slate-300 border-slate-700/60'
                 }`}>
-                  {count}
+                  {currentParentInfo?.totalCount || 0}
                 </span>
               </button>
-            );
-          })}
+
+              {/* サブフォルダたち */}
+              {currentParentInfo?.subFolders.map(sub => {
+                const isSelected = selectedSub === sub.fullName;
+                return (
+                  <button
+                    key={sub.fullName}
+                    onClick={() => setSelectedSub(isSelected ? null : sub.fullName)}
+                    className={`flex items-center justify-between px-3 py-2 rounded border text-xs font-mono transition-all cursor-pointer shadow-xs ${
+                      isSelected
+                        ? 'bg-cyan-500 border-cyan-400 text-slate-950 font-black ring-2 ring-cyan-500/30'
+                        : 'bg-slate-900 border-slate-800 hover:border-slate-700 text-slate-300 hover:bg-slate-800/80'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 min-w-0">
+                      <Folder size={14} className={isSelected ? 'text-slate-950' : 'text-slate-400'} />
+                      <span className="font-bold truncate" title={sub.name}>{sub.name}</span>
+                    </div>
+                    <span className={`ml-2 px-2 py-0.5 rounded text-[11px] font-mono font-black shrink-0 border ${
+                      isSelected
+                        ? 'bg-slate-950 text-white border-slate-800'
+                        : 'bg-slate-800 text-slate-300 border-slate-700/60'
+                    }`}>
+                      {sub.count}
+                    </span>
+                  </button>
+                );
+              })}
+            </>
+          )}
         </div>
       </div>
 
       {/* === 3. LIST TOOLBAR === */}
-      <div className="px-5 py-2 border-b border-slate-800 bg-slate-900/40 flex flex-wrap items-center justify-between gap-3 shrink-0 transition-colors">
-        <div className="flex items-center gap-3">
-          <div className="text-xs font-mono tracking-wider text-slate-400">
+      <div className="px-4 py-1.5 border-b border-slate-800 bg-slate-900/40 flex items-center justify-between gap-2 shrink-0 transition-colors overflow-x-auto select-none">
+        <div className="flex items-center gap-2 shrink-0">
+          <div className="text-xs font-mono tracking-wider text-slate-400 shrink-0">
             <span className="font-black uppercase text-white">BOOKMARKS</span>
-            <span className="mx-2 text-slate-500">|</span>
-            <span>TOTAL RECS: <strong className="text-cyan-600 dark:text-cyan-400 font-black">{filteredItems.length}</strong></span>
+            <span className="mx-1 text-slate-500">|</span>
+            <span>TOTAL: <strong className="text-cyan-600 dark:text-cyan-400 font-black">{filteredItems.length}</strong></span>
           </div>
 
-          <div className="h-4 w-px hidden sm:block bg-slate-800" />
+          <div className="h-4 w-px hidden sm:block bg-slate-800 shrink-0" />
 
           {/* 新規登録ボタン */}
           <button
             onClick={onAddLocation}
-            className="flex items-center gap-1.5 px-3 py-1 bg-cyan-600 hover:bg-cyan-500 text-black font-black text-xs uppercase tracking-wider rounded shadow transition-colors cursor-pointer"
+            className="flex items-center gap-1.5 px-3 py-1 bg-cyan-600 hover:bg-cyan-500 text-black font-black text-xs uppercase tracking-wider rounded shadow transition-colors cursor-pointer shrink-0"
           >
             <Plus size={13} strokeWidth={2.5} />
             <span>+ ADD LOCATION</span>
           </button>
+
+          {/* リスト文字サイズ調整スライダー */}
+          {onUpdateListFontSize && (
+            <>
+              <div className="h-4 w-px hidden sm:block bg-slate-800 shrink-0" />
+              <div className="hidden sm:flex items-center gap-1.5 text-xs font-mono shrink-0">
+                <span className="text-slate-400 font-bold text-[10px] uppercase tracking-wider shrink-0">TEXT:</span>
+                <input
+                  type="range"
+                  min="10"
+                  max="20"
+                  step="1"
+                  value={listFontSize}
+                  onChange={(e) => onUpdateListFontSize(Number(e.target.value))}
+                  style={{ width: '54px', minWidth: '54px', maxWidth: '54px' }}
+                  className="solid-square-slider cursor-pointer shrink-0"
+                  title={`リスト文字サイズ: ${listFontSize}px`}
+                />
+                <span className="text-cyan-400 font-bold text-[10px] shrink-0 w-6 text-right">{listFontSize}P</span>
+              </div>
+            </>
+          )}
         </div>
 
         {/* 選択関連の一括アクション ＆ Kナビゲーター上下移動ボタン [ ⤊ ] [ ↑ ] [ ↓ ] [ ⤋ ] */}
-        <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex items-center gap-1.5 shrink-0">
           {/* 全選択ボタン */}
           <button
             onClick={toggleSelectAll}
@@ -801,7 +1068,8 @@ export const LinkManagerView: React.FC<LinkManagerViewProps> = ({
                                 if (e.key === 'Enter') saveInlineTitle(item);
                                 if (e.key === 'Escape') setEditingItemId(null);
                               }}
-                              className="text-xs px-2 py-1 rounded w-full focus:outline-none shadow-sm border border-cyan-500 bg-slate-900 text-slate-100"
+                              className="px-2 py-1 rounded w-full focus:outline-none shadow-sm border border-cyan-500 bg-slate-900 text-slate-100"
+                              style={{ fontSize: `${listFontSize}px` }}
                             />
                             <button
                               onClick={() => saveInlineTitle(item)}
@@ -822,7 +1090,8 @@ export const LinkManagerView: React.FC<LinkManagerViewProps> = ({
                           <div className="flex flex-col min-w-0 flex-1 overflow-hidden">
                             <div className="flex items-center gap-1.5">
                               <span 
-                                className="font-bold truncate text-xs text-white group-hover:underline"
+                                className="font-bold truncate text-white group-hover:underline"
+                                style={{ fontSize: `${listFontSize}px` }}
                                 title={item.title}
                               >
                                 {item.title}

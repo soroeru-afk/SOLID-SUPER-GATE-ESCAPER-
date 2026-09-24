@@ -12,11 +12,6 @@
   --scrollbar-thumb-hover: rgba(255, 255, 255, 0.2);
 }
 
-.theme-navy {
-  --color-header-bg: #000000;
-  --color-overlay-bg: #000000;
-}
-
 /* Light Theme Overrides (Solid Series Standard Slate-Gray & Clean Ice Palette) */
 .theme-light {
   --color-slate-950: #f8fafc; /* メイン背景：清潔感のある白に近いオフホワイト */
@@ -83,6 +78,12 @@
   --color-cyan-400: #627592;
   --color-cyan-300: #8ba0bd;
   --color-cyan-200: #bac8dc;
+}
+
+/* Dark Theme 専用: LOCATIONヘッダーバー背景色 (添付画像通りのスレートカラー #262b36) */
+.theme-dark .location-header-bar,
+.theme-dark .h-12.bg-header-bg\/80 {
+  background-color: #262b36 !important;
 }
 
 /* Mocha Theme Overrides (Warm Dark Brown) */
