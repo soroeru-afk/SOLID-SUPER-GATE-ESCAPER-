@@ -96,6 +96,8 @@ interface LinkManagerViewProps {
   initialFolder?: string | null;
   parentFolderOrder?: string[];
   onReorderParentFolders?: (newOrder: string[]) => void;
+  subFolderOrder?: Record<string, string[]>;
+  onReorderSubFolders?: (parentName: string, newOrder: string[]) => void;
   theme?: string;
   onSelectLocation: (loc: LocationItem) => void;
   onOpenInNewTab?: (loc: LocationItem) => void;
@@ -122,6 +124,8 @@ export const LinkManagerView: React.FC<LinkManagerViewProps> = ({
   initialFolder = null,
   parentFolderOrder = [],
   onReorderParentFolders,
+  subFolderOrder = {},
+  onReorderSubFolders,
   listFontSize = 12,
   onUpdateListFontSize,
   onSelectLocation,
@@ -152,7 +156,7 @@ export const LinkManagerView: React.FC<LinkManagerViewProps> = ({
     return parts.length > 1 ? initialFolder : null;
   });
 
-  // カテゴリカードのドラッグ＆ドロップ並び替え状態
+  // カテゴリカードのドラッグ＆ドロップ並び替え状態 (第1階層 親フォルダ)
   const [draggedCardParent, setDraggedCardParent] = useState<string | null>(null);
   const [dragOverCardParent, setDragOverCardParent] = useState<string | null>(null);
 
@@ -176,6 +180,32 @@ export const LinkManagerView: React.FC<LinkManagerViewProps> = ({
     onReorderParentFolders(newOrder);
     setDraggedCardParent(null);
     setDragOverCardParent(null);
+  };
+
+  // サブカテゴリカードのドラッグ＆ドロップ並び替え状態 (第2階層 中間層フォルダ)
+  const [draggedCardSub, setDraggedCardSub] = useState<string | null>(null);
+  const [dragOverCardSub, setDragOverCardSub] = useState<string | null>(null);
+
+  const handleCardSubDrop = (targetSubName: string) => {
+    if (!draggedCardSub || draggedCardSub === targetSubName || !selectedParent || !onReorderSubFolders) {
+      setDraggedCardSub(null);
+      setDragOverCardSub(null);
+      return;
+    }
+    const currentSubs = currentParentInfo?.subFolders.map(s => s.name) || [];
+    const fromIndex = currentSubs.indexOf(draggedCardSub);
+    const toIndex = currentSubs.indexOf(targetSubName);
+    if (fromIndex === -1 || toIndex === -1) {
+      setDraggedCardSub(null);
+      setDragOverCardSub(null);
+      return;
+    }
+    const newOrder = [...currentSubs];
+    const [moved] = newOrder.splice(fromIndex, 1);
+    newOrder.splice(toIndex, 0, moved);
+    onReorderSubFolders(selectedParent, newOrder);
+    setDraggedCardSub(null);
+    setDragOverCardSub(null);
   };
 
   // initialFolder の外部変更検知
@@ -308,9 +338,23 @@ export const LinkManagerView: React.FC<LinkManagerViewProps> = ({
       if (idxB !== -1) return 1;
       return a.name.localeCompare(b.name);
     });
-    list.forEach(p => p.subFolders.sort((a, b) => a.name.localeCompare(b.name)));
+    list.forEach(p => {
+      const customSubOrder = subFolderOrder[p.name];
+      if (customSubOrder && customSubOrder.length > 0) {
+        p.subFolders.sort((a, b) => {
+          const idxA = customSubOrder.indexOf(a.name);
+          const idxB = customSubOrder.indexOf(b.name);
+          if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+          if (idxA !== -1) return -1;
+          if (idxB !== -1) return 1;
+          return a.name.localeCompare(b.name);
+        });
+      } else {
+        p.subFolders.sort((a, b) => a.name.localeCompare(b.name));
+      }
+    });
     return list;
-  }, [allFolders, folderCounts, parentFolderOrder]);
+  }, [allFolders, folderCounts, parentFolderOrder, subFolderOrder]);
 
   const currentParentInfo = useMemo(() => {
     if (!selectedParent) return null;
@@ -813,20 +857,50 @@ export const LinkManagerView: React.FC<LinkManagerViewProps> = ({
                 </span>
               </button>
 
-              {/* サブフォルダたち */}
+              {/* サブフォルダたち (第2階層 中間層) */}
               {currentParentInfo?.subFolders.map(sub => {
                 const isSelected = selectedSub === sub.fullName;
+                const isDragOver = dragOverCardSub === sub.name;
+                const isDragging = draggedCardSub === sub.name;
                 return (
                   <button
                     key={sub.fullName}
+                    draggable
+                    onDragStart={(e) => {
+                      e.dataTransfer.setData('text/plain', sub.name);
+                      setDraggedCardSub(sub.name);
+                    }}
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      if (dragOverCardSub !== sub.name) {
+                        setDragOverCardSub(sub.name);
+                      }
+                    }}
+                    onDragLeave={() => {
+                      if (dragOverCardSub === sub.name) {
+                        setDragOverCardSub(null);
+                      }
+                    }}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      handleCardSubDrop(sub.name);
+                    }}
+                    onDragEnd={() => {
+                      setDraggedCardSub(null);
+                      setDragOverCardSub(null);
+                    }}
                     onClick={() => setSelectedSub(isSelected ? null : sub.fullName)}
                     className={`flex items-center justify-between px-3 py-2 rounded border text-xs font-mono transition-all cursor-pointer shadow-xs ${
+                      isDragOver ? 'ring-2 ring-cyan-400 border-cyan-400' : ''
+                    } ${isDragging ? 'opacity-40' : ''} ${
                       isSelected
                         ? 'bg-cyan-500 border-cyan-400 text-slate-950 font-black ring-2 ring-cyan-500/30'
-                        : 'bg-slate-900 border-slate-800 hover:border-slate-700 text-slate-300 hover:bg-slate-800/80'
+                        : 'bg-slate-900 border-slate-800 hover:border-cyan-500/50 hover:bg-slate-800/90 text-slate-300 hover:text-white'
                     }`}
+                    title="クリックで選択 / ドラッグでサブカテゴリー並べ替え"
                   >
-                    <div className="flex items-center gap-2 min-w-0">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <GripVertical size={12} className={`shrink-0 cursor-grab ${isSelected ? 'text-slate-900' : 'text-slate-500'}`} />
                       <Folder size={14} className={isSelected ? 'text-slate-950' : 'text-slate-400'} />
                       <span className="font-bold truncate" title={sub.name}>{sub.name}</span>
                     </div>
@@ -1229,7 +1303,12 @@ export const LinkManagerView: React.FC<LinkManagerViewProps> = ({
                       onClick={(e) => e.stopPropagation()}
                     >
                       <button
-                        onClick={() => setSelectedFolder(item.folderName || 'Unassigned')}
+                        onClick={() => {
+                          const folder = item.folderName || 'Unassigned';
+                          const parts = folder.split(' / ');
+                          setSelectedParent(parts[0].trim());
+                          setSelectedSub(parts.length > 1 ? folder : null);
+                        }}
                         className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[11px] max-w-full truncate transition-colors cursor-pointer border border-slate-700 bg-slate-900 text-slate-300 hover:border-cyan-500 hover:text-cyan-400"
                         title="このフォルダで絞り込む"
                       >

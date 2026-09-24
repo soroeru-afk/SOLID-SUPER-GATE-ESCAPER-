@@ -518,6 +518,18 @@ export default function App() {
   const [draggedParentFolder, setDraggedParentFolder] = useState<string | null>(null);
   const [dragOverParentFolder, setDragOverParentFolder] = useState<string | null>(null);
 
+  // 第2階層サブカテゴリーの並び替え状態 (localStorageで永続化)
+  const [subFolderOrder, setSubFolderOrder] = useState<Record<string, string[]>>(() => {
+    try {
+      const saved = localStorage.getItem('knav_sub_folder_order');
+      return saved ? JSON.parse(saved) : {};
+    } catch {
+      return {};
+    }
+  });
+  const [draggedSubFolder, setDraggedSubFolder] = useState<{ parentName: string; subName: string } | null>(null);
+  const [dragOverSubFolder, setDragOverSubFolder] = useState<{ parentName: string; subName: string } | null>(null);
+
   // サイドバー親カテゴリーのドロップ処理
   const handleParentFolderDrop = (targetParent: string) => {
     if (!draggedParentFolder || draggedParentFolder === targetParent) {
@@ -547,6 +559,54 @@ export default function App() {
 
     setDraggedParentFolder(null);
     setDragOverParentFolder(null);
+  };
+
+  // サブカテゴリーの順序更新関数
+  const updateSubFolderOrder = (parentName: string, newOrder: string[]) => {
+    setSubFolderOrder(prev => {
+      const updated = {
+        ...prev,
+        [parentName]: newOrder,
+      };
+      try {
+        localStorage.setItem('knav_sub_folder_order', JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
+  };
+
+  // サイドバー第2階層サブカテゴリーのドロップ処理
+  const handleSubFolderDrop = (parentName: string, targetSubName: string) => {
+    if (!draggedSubFolder || draggedSubFolder.parentName !== parentName || draggedSubFolder.subName === targetSubName) {
+      setDraggedSubFolder(null);
+      setDragOverSubFolder(null);
+      return;
+    }
+
+    const parentGroup = hierarchicalFolders.find(p => p.name === parentName);
+    if (!parentGroup) {
+      setDraggedSubFolder(null);
+      setDragOverSubFolder(null);
+      return;
+    }
+
+    const currentOrder = parentGroup.subGroups.map(s => s.subName);
+    const fromIndex = currentOrder.indexOf(draggedSubFolder.subName);
+    const toIndex = currentOrder.indexOf(targetSubName);
+    if (fromIndex === -1 || toIndex === -1) {
+      setDraggedSubFolder(null);
+      setDragOverSubFolder(null);
+      return;
+    }
+
+    const newSubList = [...currentOrder];
+    const [moved] = newSubList.splice(fromIndex, 1);
+    newSubList.splice(toIndex, 0, moved);
+
+    updateSubFolderOrder(parentName, newSubList);
+
+    setDraggedSubFolder(null);
+    setDragOverSubFolder(null);
   };
 
   // マネージャー内でのアイテム上下並び替え関数
@@ -968,10 +1028,22 @@ export default function App() {
     });
 
     return sortedParents.map(p => {
-      p.subGroups.sort((a, b) => a.subName.localeCompare(b.subName));
+      const customSubOrder = subFolderOrder[p.name];
+      if (customSubOrder && customSubOrder.length > 0) {
+        p.subGroups.sort((a, b) => {
+          const idxA = customSubOrder.indexOf(a.subName);
+          const idxB = customSubOrder.indexOf(b.subName);
+          if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+          if (idxA !== -1) return -1;
+          if (idxB !== -1) return 1;
+          return a.subName.localeCompare(b.subName);
+        });
+      } else {
+        p.subGroups.sort((a, b) => a.subName.localeCompare(b.subName));
+      }
       return p;
     });
-  }, [folderGroups, parentFolderOrder]);
+  }, [folderGroups, parentFolderOrder, subFolderOrder]);
 
   // Handlers
   const toggleFolder = (folderName: string) => {
@@ -1583,10 +1655,52 @@ export default function App() {
                           {/* 子フォルダ */}
                           {parent.subGroups.map(sub => {
                             const isSubOpen = searchQuery ? true : !!folderState[sub.fullName];
+                            const isSubDragging = draggedSubFolder?.parentName === parent.name && draggedSubFolder?.subName === sub.subName;
+                            const isSubDragOver = dragOverSubFolder?.parentName === parent.name && dragOverSubFolder?.subName === sub.subName;
                             
                             return (
-                              <div key={sub.fullName} className="mb-1">
+                              <div 
+                                key={sub.fullName} 
+                                className={`mb-1 transition-all ${isSubDragOver ? 'border-t-2 border-cyan-400 pt-0.5' : ''} ${isSubDragging ? 'opacity-40' : ''}`}
+                                onDragOver={(e) => {
+                                  if (draggedSubFolder && draggedSubFolder.parentName === parent.name) {
+                                    e.preventDefault();
+                                    if (dragOverSubFolder?.parentName !== parent.name || dragOverSubFolder?.subName !== sub.subName) {
+                                      setDragOverSubFolder({ parentName: parent.name, subName: sub.subName });
+                                    }
+                                  }
+                                }}
+                                onDragLeave={() => {
+                                  if (dragOverSubFolder?.parentName === parent.name && dragOverSubFolder?.subName === sub.subName) {
+                                    setDragOverSubFolder(null);
+                                  }
+                                }}
+                                onDrop={(e) => {
+                                  if (draggedSubFolder && draggedSubFolder.parentName === parent.name) {
+                                    e.preventDefault();
+                                    handleSubFolderDrop(parent.name, sub.subName);
+                                  }
+                                }}
+                              >
                                 <div className="flex items-center group/sub relative p-1 rounded-sm transition-colors hover:bg-slate-800/40">
+                                  {/* ドラッグハンドル */}
+                                  <div 
+                                    draggable
+                                    onDragStart={(e) => {
+                                      e.stopPropagation();
+                                      e.dataTransfer.setData('text/plain', sub.subName);
+                                      setDraggedSubFolder({ parentName: parent.name, subName: sub.subName });
+                                    }}
+                                    onDragEnd={() => {
+                                      setDraggedSubFolder(null);
+                                      setDragOverSubFolder(null);
+                                    }}
+                                    className="cursor-grab active:cursor-grabbing text-slate-500 hover:text-slate-200 p-0.5 mr-0.5 shrink-0 transition-colors" 
+                                    title="ドラッグしてサブカテゴリーを移動・並べ替え"
+                                  >
+                                    <GripVertical size={11} />
+                                  </div>
+
                                   <button 
                                     className="flex-1 flex items-center text-slate-200 hover:text-white transition-colors text-left min-w-0"
                                     onClick={() => toggleFolder(sub.fullName)}
@@ -2189,6 +2303,8 @@ export default function App() {
                     localStorage.setItem('knav_parent_folder_order', JSON.stringify(newOrder));
                   } catch {}
                 }}
+                subFolderOrder={subFolderOrder}
+                onReorderSubFolders={updateSubFolderOrder}
                 listFontSize={getListFontSizePx()}
                 onUpdateListFontSize={(size) => saveSettings({ ...settings, listFontSize: size })}
                 theme={settings.theme}
