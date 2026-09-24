@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Settings, Folder, FolderOpen, File as FileIcon, X, Search, Plus, Minus, RotateCw, Trash2, Edit2, Upload, Download, Map as MapIcon, ChevronRight, ChevronLeft, ChevronsRight, ChevronsLeft, ChevronUp, ChevronDown, Menu, Check, Copy, PanelLeftClose, PanelRightClose, PanelLeftOpen, PanelRightOpen, PanelLeft, PanelRight, Maximize, Minimize, Palette, Eye, EyeOff, ExternalLink } from 'lucide-react';
+import { Settings, Folder, FolderOpen, File as FileIcon, X, Search, Plus, Minus, RotateCw, Trash2, Edit2, Upload, Download, Map as MapIcon, ChevronRight, ChevronLeft, ChevronsRight, ChevronsLeft, ChevronUp, ChevronDown, Menu, Check, Copy, PanelLeftClose, PanelRightClose, PanelLeftOpen, PanelRightOpen, PanelLeft, PanelRight, Maximize, Minimize, Palette, Eye, EyeOff, ExternalLink, LayoutList, GripVertical, ArrowUp, ArrowDown, Layers, Compass } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { LinkManagerView } from './components/LinkManagerView';
 
 // === Types ===
 interface LocationItem {
@@ -87,6 +88,11 @@ const translations = {
     selectAll: '全選択',
     deselectAll: '全解除',
     openInTabs: '選択項目をタブ化して開く',
+    viewModeViewer: 'ビューア',
+    viewModeManager: 'リスト管理',
+    allData: '[ ALL DATA ]',
+    subDirectories: 'SUB-DIRECTORIES',
+    bookmarksList: 'BOOKMARKS LIST',
   },
   en: {
     viewer: 'STREET VIEW VIEWER',
@@ -137,6 +143,11 @@ const translations = {
     selectAll: 'SELECT ALL',
     deselectAll: 'DESELECT ALL',
     openInTabs: 'Open Selected in Tabs',
+    viewModeViewer: 'VIEWER',
+    viewModeManager: 'MANAGER',
+    allData: '[ ALL DATA ]',
+    subDirectories: 'SUB-DIRECTORIES',
+    bookmarksList: 'BOOKMARKS LIST',
   }
 };
 
@@ -377,6 +388,7 @@ export default function App() {
   }, [tabs, activeTabId]);
 
   const handleItemClick = (item: LocationItem) => {
+    setMainViewMode('viewer');
     // タブが1つもない、またはアクティブタブIDがない場合は新規タブを作成して開く
     if (tabs.length === 0 || !activeTabId) {
       const newTabId = crypto.randomUUID();
@@ -437,6 +449,60 @@ export default function App() {
   const [editTarget, setEditTarget] = useState<LocationItem | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isResizingSidebar, setIsResizingSidebar] = useState(false);
+
+  // メイン画面の表示モード ('viewer': ストリートビュー, 'manager': リンクマネージャー/リスト編集)
+  const [mainViewMode, setMainViewMode] = useState<'viewer' | 'manager'>('viewer');
+  const [managerFolder, setManagerFolder] = useState<string | null>(null);
+  const [managerSearch, setManagerSearch] = useState('');
+  const [draggedManagerId, setDraggedManagerId] = useState<string | null>(null);
+
+  // マネージャー内でのアイテム上下並び替え関数
+  const moveItemOrder = (itemId: string, direction: 'up' | 'down') => {
+    const currentIndex = locations.findIndex(loc => loc.id === itemId);
+    if (currentIndex === -1) return;
+
+    if (managerFolder) {
+      // 特定フォルダ表示中の場合、そのフォルダ内での前後の要素と入れ替える
+      const folderItems = locations.filter(loc => loc.folderName === managerFolder);
+      const folderItemIndex = folderItems.findIndex(loc => loc.id === itemId);
+      const targetFolderIndex = direction === 'up' ? folderItemIndex - 1 : folderItemIndex + 1;
+      if (targetFolderIndex < 0 || targetFolderIndex >= folderItems.length) return;
+      const targetItem = folderItems[targetFolderIndex];
+      const targetGlobalIndex = locations.findIndex(loc => loc.id === targetItem.id);
+      
+      const newLocs = [...locations];
+      const [removed] = newLocs.splice(currentIndex, 1);
+      newLocs.splice(targetGlobalIndex, 0, removed);
+      saveLocations(newLocs);
+    } else {
+      // 全件表示中の場合
+      const targetIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
+      if (targetIndex < 0 || targetIndex >= locations.length) return;
+      const newLocs = [...locations];
+      const [removed] = newLocs.splice(currentIndex, 1);
+      newLocs.splice(targetIndex, 0, removed);
+      saveLocations(newLocs);
+    }
+  };
+
+  // ドラッグ＆ドロップによる並べ替え
+  const handleItemDrop = (targetId: string) => {
+    if (!draggedManagerId || draggedManagerId === targetId) {
+      setDraggedManagerId(null);
+      return;
+    }
+    const fromIndex = locations.findIndex(l => l.id === draggedManagerId);
+    const toIndex = locations.findIndex(l => l.id === targetId);
+    if (fromIndex === -1 || toIndex === -1) {
+      setDraggedManagerId(null);
+      return;
+    }
+    const newLocs = [...locations];
+    const [moved] = newLocs.splice(fromIndex, 1);
+    newLocs.splice(toIndex, 0, moved);
+    saveLocations(newLocs);
+    setDraggedManagerId(null);
+  };
 
   // 境界線グリップハンドルのドラッグによるサイドバー幅変更処理（左右どちらでも完璧にリアルタイム追従）
   const handleBoundaryPointerDown = (e: React.PointerEvent) => {
@@ -512,25 +578,6 @@ export default function App() {
       window.removeEventListener('keydown', onKeyDown);
     };
   }, [isImmersive]);
-
-  // テーマ切り替え時にブラウザのmeta theme-colorおよびテーマ配色を連動
-  useEffect(() => {
-    let metaTheme = document.querySelector('meta[name="theme-color"]');
-    if (!metaTheme) {
-      metaTheme = document.createElement('meta');
-      metaTheme.setAttribute('name', 'theme-color');
-      document.head.appendChild(metaTheme);
-    }
-    const themeColors: Record<string, string> = {
-      navy: '#000000',
-      dark: '#0a0a0a',
-      light: '#f8fafc',
-      mocha: '#59483A',
-      latte: '#9E8668',
-    };
-    const color = themeColors[settings.theme || 'navy'] || '#000000';
-    metaTheme.setAttribute('content', color);
-  }, [settings.theme]);
 
   const toggleFullscreen = () => {
     const docEl = document.documentElement as any;
@@ -662,6 +709,25 @@ export default function App() {
       localStorage.removeItem('sv_active_tab_id');
     }
   }, [tabs, activeTabId]);
+
+  // Dynamic theme-color meta tag sync (Solid series standard: synchronized to Sidebar Header background)
+  useEffect(() => {
+    const themeHeaderColors: Record<string, string> = {
+      navy: '#000000',
+      dark: '#14171d',
+      light: '#ffffff',
+      mocha: '#59483A',
+      latte: '#9E8668',
+    };
+    const currentColor = themeHeaderColors[settings.theme || 'navy'] || '#000000';
+    let metaTag = document.querySelector('meta[name="theme-color"]');
+    if (!metaTag) {
+      metaTag = document.createElement('meta');
+      metaTag.setAttribute('name', 'theme-color');
+      document.head.appendChild(metaTag);
+    }
+    metaTag.setAttribute('content', currentColor);
+  }, [settings.theme]);
 
   // Save changes
   const saveLocations = (newLocs: LocationItem[]) => {
@@ -1098,72 +1164,81 @@ export default function App() {
             overflow: 'hidden'
           }}
         >
-          <div style={{ width: `${settings.sidebarWidth}px` }} className="flex flex-col h-full shrink-0">
-            {/* Header Area */}
-          <div className="h-24 px-4 pb-3 pt-4 border-b border-slate-800 bg-header-bg shrink-0 flex items-end justify-between gap-2">
-            <div className="flex flex-col">
-              <h1 className="text-xl font-black text-transparent bg-clip-text bg-gradient-to-br from-white to-slate-400 tracking-tighter uppercase leading-tight">
-                SOLID SUPER<br/>GATE ESCAPER
-              </h1>
-              <span className="text-[10px] text-cyan-500 font-bold tracking-widest mt-1.5 leading-none">{t('viewer')}</span>
+          <div 
+            style={{ width: `${settings.sidebarWidth}px` }} 
+            className="flex flex-col h-full shrink-0 relative overflow-hidden"
+          >
+            {/* Header Area (透明度を適用せず、常に不透明なソリッドヘッダー) */}
+            <div className="h-24 px-4 pb-3 pt-4 border-b border-slate-800 bg-header-bg shrink-0 flex items-end justify-between gap-2 z-20 relative">
+              <div className="flex flex-col">
+                <h1 className="text-xl font-black text-transparent bg-clip-text bg-gradient-to-br from-white to-slate-400 tracking-tighter uppercase leading-tight">
+                  SOLID SUPER<br/>GATE ESCAPER
+                </h1>
+                <span className="text-[10px] text-cyan-500 font-bold tracking-widest mt-1.5 leading-none">{t('viewer')}</span>
+              </div>
+              <div className="flex border border-slate-700 rounded-sm overflow-hidden text-[9px] font-bold shrink-0 mb-[1px] lang-toggle-container">
+                <button 
+                  onClick={() => saveSettings({ ...settings, language: 'en' })}
+                  className={`px-1.5 py-0.5 transition-colors ${settings.language === 'en' ? 'bg-slate-400 text-slate-900' : 'bg-slate-900 text-slate-400 hover:bg-slate-800'}`}
+                >
+                  EN
+                </button>
+                <button 
+                  onClick={() => saveSettings({ ...settings, language: 'jp' })}
+                  className={`px-1.5 py-0.5 transition-colors ${settings.language === 'jp' ? 'bg-slate-400 text-slate-900' : 'bg-slate-900 text-slate-400 hover:bg-slate-800'}`}
+                >
+                  JP
+                </button>
+              </div>
             </div>
-            <div className="flex border border-slate-700 rounded-sm overflow-hidden text-[9px] font-bold shrink-0 mb-[1px] lang-toggle-container">
-              <button 
-                onClick={() => saveSettings({ ...settings, language: 'en' })}
-                className={`px-1.5 py-0.5 transition-colors ${settings.language === 'en' ? 'bg-slate-400 text-slate-900' : 'bg-slate-900 text-slate-400 hover:bg-slate-800'}`}
-              >
-                EN
-              </button>
-              <button 
-                onClick={() => saveSettings({ ...settings, language: 'jp' })}
-                className={`px-1.5 py-0.5 transition-colors ${settings.language === 'jp' ? 'bg-slate-400 text-slate-900' : 'bg-slate-900 text-slate-400 hover:bg-slate-800'}`}
-              >
-                JP
-              </button>
-            </div>
-          </div>
 
-          <div className="flex flex-col flex-1 min-h-0 relative z-10">
-            {/* === 背景だけを透明にするためのレイヤー === */}
-            <div 
-              className="absolute inset-0 bg-slate-900 -z-10"
-              style={{ opacity: settings.sidebarOpacity ?? 1 }}
-            />
-            <div className="p-4 border-b border-slate-800 shrink-0 flex flex-col gap-3">
-            <input type="file" ref={fileInputRef} accept=".html,.json" className="hidden" onChange={handleFileUpload} />
-            <button 
-              onClick={() => fileInputRef.current?.click()}
-              className="w-full flex items-center justify-center gap-2 p-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-md text-xs font-bold text-slate-300 transition-colors uppercase tracking-wider"
-            >
-              <Download size={14} /> {t('loadBookmark')}
-            </button>
-
-            <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500">
-                <Search size={14} />
-              </span>
-              <input 
-                type="text" 
-                placeholder={t('searchLoc')} 
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-9 pr-3 py-1.5 bg-header-bg/40 border border-slate-700 rounded-md text-xs text-slate-200 focus:border-cyan-500 focus:outline-none transition-colors"
+            {/* 下部リストエリア（ヘッダー下のみに透明度レイヤーを適用） */}
+            <div className="flex flex-col flex-1 min-h-0 relative z-10 bg-transparent">
+              {/* リストエリアの背景レイヤー（リスト管理モードでは自動で1.0、ビューアーモードでは設定した透明度） */}
+              <div 
+                className="absolute inset-0 bg-slate-950 backdrop-blur-md -z-10 pointer-events-none transition-opacity duration-150"
+                style={{ 
+                  opacity: mainViewMode === 'manager' ? 1 : (settings.sidebarOpacity ?? 1) 
+                }}
               />
-            </div>
-          </div>
 
-          {/* === Toolbar === */}
-          <div className="flex items-center justify-between text-[10px] font-mono text-slate-500 bg-slate-900/10 px-4 py-2 border-b border-slate-800 shrink-0">
-            <div className="flex items-center gap-3 min-w-0">
-              <span className="font-bold tracking-widest shrink-0">{locations.length} FILES</span>
+              <div className="p-4 border-b border-slate-800/80 shrink-0 flex flex-col gap-3">
+              <input type="file" ref={fileInputRef} accept=".html,.json" className="hidden" onChange={handleFileUpload} />
+              <button 
+                onClick={() => fileInputRef.current?.click()}
+                className="w-full flex items-center justify-center gap-2 p-2.5 bg-slate-700 hover:bg-slate-600 border border-slate-600 rounded-md text-xs font-bold text-white transition-colors uppercase tracking-wider shadow-sm cursor-pointer"
+              >
+                <Download size={14} /> {t('loadBookmark')}
+              </button>
+
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
+                  <Search size={14} />
+                </span>
+                <input 
+                  type="text" 
+                  placeholder={t('searchLoc')} 
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full pl-9 pr-3 py-1.5 bg-slate-900/30 hover:bg-slate-900/50 focus:bg-slate-900/60 border border-slate-700/60 rounded-md text-xs text-slate-100 placeholder-slate-400 focus:border-cyan-500 focus:outline-none transition-colors"
+                />
+              </div>
+            </div>
+
+          {/* === Toolbar (透明度が素直に反映されるクリーンなスタイル) === */}
+          <div className="flex items-center justify-between text-[10px] font-mono text-slate-400 px-3 py-1.5 border-b border-slate-800/50 shrink-0">
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="font-bold tracking-widest shrink-0 text-slate-300">
+                {locations.length} FILES
+              </span>
               <button 
                 onClick={() => setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')} 
-                className="flex items-center gap-1 hover:text-slate-300 transition-colors whitespace-nowrap font-bold shrink-0"
+                className="flex items-center gap-0.5 hover:text-slate-200 transition-colors whitespace-nowrap font-bold shrink-0 cursor-pointer"
               >
                 名前順 {sortOrder === 'asc' ? '▼' : '▲'}
               </button>
             </div>
-            <div className="flex items-center gap-2 shrink-0">
+            <div className="flex items-center gap-1.5 shrink-0">
               {isSelectMode && locations.length > 0 && (
                 <button
                   onClick={() => {
@@ -1173,7 +1248,7 @@ export default function App() {
                       setSelectedIds(new Set(locations.map(l => l.id)));
                     }
                   }}
-                  className="hover:text-slate-200 transition-colors text-[9px] font-bold text-slate-400 hover:text-white uppercase whitespace-nowrap"
+                  className="hover:text-slate-200 transition-colors text-[9px] font-bold text-slate-400 hover:underline uppercase whitespace-nowrap cursor-pointer px-1"
                   title={selectedIds.size === locations.length ? t('deselectAll') : t('selectAll')}
                 >
                   {selectedIds.size === locations.length ? t('deselectAll') : t('selectAll')}
@@ -1182,7 +1257,7 @@ export default function App() {
               {isSelectMode && selectedIds.size > 0 && (
                 <button 
                   onClick={openSelectedInTabs}
-                  className="flex items-center gap-1 bg-cyan-600 hover:bg-cyan-500 text-black text-[9px] font-bold px-2 py-0.5 rounded-full transition-colors uppercase tracking-wider shrink-0 cursor-pointer shadow-sm"
+                  className="flex items-center gap-1 bg-cyan-600 hover:bg-cyan-500 text-black text-[9px] font-bold px-2 py-0.5 rounded-full transition-colors uppercase tracking-wider shrink-0 cursor-pointer shadow-xs"
                   title="選択した項目をすべてタブで開く"
                 >
                   <FolderOpen size={10} />
@@ -1194,29 +1269,34 @@ export default function App() {
                   setIsSelectMode(!isSelectMode);
                   if (isSelectMode) setSelectedIds(new Set()); // モード切替時に選択リセット
                 }} 
-                className={`transition-colors whitespace-nowrap px-2.5 py-0.5 rounded-full border font-bold tracking-wider uppercase text-[10px] cursor-pointer ${isSelectMode ? 'bg-cyan-900/40 text-cyan-300 border-cyan-500/80 shadow-[0_0_8px_rgba(6,182,212,0.3)]' : 'bg-slate-800/80 hover:bg-slate-700 hover:text-white text-slate-300 border-slate-700'}`}
+                className={`transition-colors whitespace-nowrap px-2.5 py-0.5 rounded-full border font-bold tracking-wider uppercase text-[10px] cursor-pointer ${
+                  isSelectMode 
+                    ? 'bg-cyan-600 border-cyan-500 text-black shadow-xs font-black' 
+                    : 'bg-slate-800/40 hover:bg-slate-800/80 hover:text-white text-slate-300 border-slate-700/60'
+                }`}
               >
                 {isSelectMode ? t('selectDone') : t('select')}
               </button>
-              <div className="flex items-center gap-2 ml-1">
+              
+              <div className="flex items-center gap-1.5 ml-1">
                 <button 
                   onClick={() => setFolderState(allFolders.reduce((acc, k) => ({...acc, [k]: true}), {}))} 
-                  className="hover:text-slate-300 transition-colors opacity-70 hover:opacity-100" 
-                  title="Expand All"
+                  className="hover:text-slate-200 text-slate-400 transition-colors cursor-pointer p-0.5" 
+                  title="すべて展開 (Expand All)"
                 >
-                  <Plus size={14} />
+                  <Plus size={13} />
                 </button>
                 <button 
                   onClick={() => setFolderState({})} 
-                  className="hover:text-slate-300 transition-colors opacity-70 hover:opacity-100" 
-                  title="Collapse All"
+                  className="hover:text-slate-200 text-slate-400 transition-colors cursor-pointer p-0.5" 
+                  title="すべて折りたたむ (Collapse All)"
                 >
-                  <Minus size={14} />
+                  <Minus size={13} />
                 </button>
                 <button 
                   onClick={() => window.location.reload()} 
-                  className="hover:text-slate-300 transition-colors opacity-70 hover:opacity-100" 
-                  title="Refresh"
+                  className="hover:text-slate-200 text-slate-400 transition-colors cursor-pointer p-0.5" 
+                  title="再読み込み (Refresh)"
                 >
                   <RotateCw size={12} />
                 </button>
@@ -1243,21 +1323,24 @@ export default function App() {
                   return (
                     <div key={parent.name} className="mb-2">
                       {/* 親フォルダ */}
-                      <div className="flex items-center group relative p-1 rounded-sm transition-colors hover:bg-slate-800/50">
+                      <div className="flex items-center group relative p-1 rounded-sm transition-colors hover:bg-slate-800/60">
                         <button 
-                          className="flex-1 flex items-center text-slate-300 hover:text-white transition-colors text-left min-w-0"
+                          className="flex-1 flex items-center text-slate-200 hover:text-white transition-colors text-left min-w-0"
                           onClick={() => toggleFolder(parent.name)}
                         >
                           <ChevronRight size={14} className={`mr-1 transition-transform shrink-0 ${isParentOpen ? 'rotate-90' : ''}`} />
-                          <Folder size={14} className="mr-2 opacity-80 shrink-0" style={{ color: settings.folderIconColor || '#06b6d4' }} />
+                          <Folder 
+                            size={14} 
+                            className="mr-2 opacity-80 shrink-0 text-slate-400" 
+                          />
                           <span className="flex-1 truncate uppercase font-bold tracking-wider" style={{ fontSize: `${fs}px` }}>
                             {parent.name}
                           </span>
-                          <span className="text-[9px] bg-slate-800 px-1.5 rounded-sm opacity-50 shrink-0 mr-2">{parent.totalCount}</span>
+                          <span className="text-[9px] bg-slate-800 border border-slate-700/60 text-slate-300 font-bold px-1.5 rounded-sm shrink-0 mr-2">{parent.totalCount}</span>
                         </button>
                         <div className="absolute right-1 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity bg-slate-900 px-1 rounded-sm">
-                          <button onClick={(e) => editParentFolder(parent.name, e)} className="p-1 hover:text-cyan-400 text-slate-500 transition-colors cursor-pointer"><Edit2 size={12}/></button>
-                          <button onClick={(e) => deleteParentFolder(parent.name, e)} className="p-1 hover:text-red-400 text-slate-500 transition-colors cursor-pointer"><Trash2 size={12}/></button>
+                          <button onClick={(e) => editParentFolder(parent.name, e)} className="p-1 hover:text-cyan-400 text-slate-400 transition-colors cursor-pointer"><Edit2 size={12}/></button>
+                          <button onClick={(e) => deleteParentFolder(parent.name, e)} className="p-1 hover:text-red-400 text-slate-400 transition-colors cursor-pointer"><Trash2 size={12}/></button>
                         </div>
                       </div>
 
@@ -1269,21 +1352,21 @@ export default function App() {
                             
                             return (
                               <div key={sub.fullName} className="mb-1">
-                                <div className="flex items-center group/sub relative p-1 rounded-sm transition-colors hover:bg-slate-800/30">
+                                <div className="flex items-center group/sub relative p-1 rounded-sm transition-colors hover:bg-slate-800/40">
                                   <button 
-                                    className="flex-1 flex items-center text-slate-400 hover:text-white transition-colors text-left min-w-0"
+                                    className="flex-1 flex items-center text-slate-200 hover:text-white transition-colors text-left min-w-0"
                                     onClick={() => toggleFolder(sub.fullName)}
                                   >
                                     <ChevronRight size={12} className={`mr-1 transition-transform shrink-0 ${isSubOpen ? 'rotate-90' : ''}`} />
-                                    <FolderOpen size={12} className="mr-2 opacity-50 shrink-0 text-slate-400" />
+                                    <FolderOpen size={12} className="mr-2 opacity-80 shrink-0 text-slate-400" />
                                     <span className="flex-1 truncate font-bold tracking-wide" style={{ fontSize: `${Math.max(9, fs - 1)}px` }}>
                                       {sub.subName}
                                     </span>
-                                    <span className="text-[9px] bg-slate-800/50 px-1.5 rounded-sm opacity-40 shrink-0 mr-2">{sub.items.length}</span>
+                                    <span className="text-[9px] bg-slate-800/80 border border-slate-700/40 text-slate-300 font-bold px-1.5 rounded-sm shrink-0 mr-2">{sub.items.length}</span>
                                   </button>
                                   <div className="absolute right-1 flex gap-1 opacity-0 group-hover/sub:opacity-100 transition-opacity bg-slate-900 px-1 rounded-sm">
-                                    <button onClick={(e) => editFolder(sub.fullName, e)} className="p-1 hover:text-cyan-400 text-slate-500 transition-colors cursor-pointer"><Edit2 size={10}/></button>
-                                    <button onClick={(e) => deleteFolder(sub.fullName, e)} className="p-1 hover:text-red-400 text-slate-500 transition-colors cursor-pointer"><Trash2 size={10}/></button>
+                                    <button onClick={(e) => editFolder(sub.fullName, e)} className="p-1 hover:text-cyan-400 text-slate-400 transition-colors cursor-pointer"><Edit2 size={10}/></button>
+                                    <button onClick={(e) => deleteFolder(sub.fullName, e)} className="p-1 hover:text-red-400 text-slate-400 transition-colors cursor-pointer"><Trash2 size={10}/></button>
                                   </div>
                                 </div>
 
@@ -1297,7 +1380,7 @@ export default function App() {
                                           key={item.id} 
                                           className={`
                                             flex items-center py-1.5 px-2 rounded-sm cursor-pointer border-l-2 transition-colors group/item relative
-                                            ${isActive ? 'bg-cyan-900/20 border-cyan-500 text-cyan-400' : 'border-transparent text-slate-400 hover:bg-slate-800/50 hover:text-slate-200'}
+                                            ${isActive ? 'bg-cyan-500/20 border-cyan-500 text-white font-bold' : 'border-transparent text-slate-200 hover:bg-slate-800/60 hover:text-white'}
                                           `}
                                           onClick={() => {
                                             if (isSelectMode) {
@@ -1323,11 +1406,11 @@ export default function App() {
                                           <div className="flex-1 min-w-0 flex flex-col">
                                             <span className="truncate font-semibold leading-snug" style={{ fontSize: `${fs}px` }}>{item.title}</span>
                                             <div className="flex items-center gap-2 mt-0.5">
-                                              <span className="truncate opacity-60" style={{ fontSize: `${Math.max(8, fs - 3)}px` }}>
+                                              <span className={`truncate ${isActive ? 'text-slate-200 font-medium' : 'text-slate-400 group-hover/item:text-slate-300'}`} style={{ fontSize: `${Math.max(8, fs - 3)}px` }}>
                                                 {item.parsed?.isValid ? `🧭 ${item.parsed.lat}, ${item.parsed.lng}` : '🗺️ 通常URL'}
                                               </span>
                                               {item.capturedDate && (
-                                                <span className="bg-slate-950/50 text-cyan-400 px-1 rounded-sm border border-slate-800 shrink-0 uppercase tracking-widest font-mono" style={{ fontSize: `${Math.max(8, fs - 3)}px` }}>
+                                                <span className={`${isActive ? 'bg-cyan-500/25 text-cyan-200 border-cyan-400/50' : 'bg-slate-900 text-cyan-300 border-slate-700/80'} px-1 rounded-sm border shrink-0 uppercase tracking-widest font-mono font-bold`} style={{ fontSize: `${Math.max(8, fs - 3)}px` }}>
                                                   {item.capturedDate}
                                                 </span>
                                               )}
@@ -1364,7 +1447,7 @@ export default function App() {
                                 key={item.id} 
                                 className={`
                                   flex items-center py-1.5 px-2 rounded-sm cursor-pointer border-l-2 transition-colors group/item relative
-                                  ${isActive ? 'bg-cyan-900/20 border-cyan-500 text-cyan-400' : 'border-transparent text-slate-400 hover:bg-slate-800/50 hover:text-slate-200'}
+                                  ${isActive ? 'bg-cyan-500/20 border-cyan-500 text-white font-bold' : 'border-transparent text-slate-200 hover:bg-slate-800/60 hover:text-white'}
                                 `}
                                 onClick={() => {
                                   if (isSelectMode) {
@@ -1390,11 +1473,11 @@ export default function App() {
                                 <div className="flex-1 min-w-0 flex flex-col">
                                   <span className="truncate font-semibold leading-snug" style={{ fontSize: `${fs}px` }}>{item.title}</span>
                                   <div className="flex items-center gap-2 mt-0.5">
-                                    <span className="truncate opacity-60" style={{ fontSize: `${Math.max(8, fs - 3)}px` }}>
+                                    <span className={`truncate ${isActive ? 'text-slate-200 font-medium' : 'text-slate-400 group-hover/item:text-slate-300'}`} style={{ fontSize: `${Math.max(8, fs - 3)}px` }}>
                                       {item.parsed?.isValid ? `🧭 ${item.parsed.lat}, ${item.parsed.lng}` : '🗺️ 通常URL'}
                                     </span>
                                     {item.capturedDate && (
-                                      <span className="bg-slate-950/50 text-cyan-400 px-1 rounded-sm border border-slate-800 shrink-0 uppercase tracking-widest font-mono" style={{ fontSize: `${Math.max(8, fs - 3)}px` }}>
+                                      <span className={`${isActive ? 'bg-cyan-500/25 text-cyan-200 border-cyan-400/50' : 'bg-slate-900 text-cyan-300 border-slate-700/80'} px-1 rounded-sm border shrink-0 uppercase tracking-widest font-mono font-bold`} style={{ fontSize: `${Math.max(8, fs - 3)}px` }}>
                                         {item.capturedDate}
                                       </span>
                                     )}
@@ -1494,6 +1577,20 @@ export default function App() {
             >
               <Plus size={14} /> {t('register')}
             </button>
+
+            {/* リストマネージャー画面を開くボタン */}
+            <button 
+              onClick={() => setMainViewMode(prev => prev === 'viewer' ? 'manager' : 'viewer')}
+              className={`w-full flex justify-center items-center gap-2 text-xs font-bold py-1.5 rounded-md border transition-all uppercase tracking-wider ${
+                mainViewMode === 'manager' 
+                  ? 'bg-cyan-950/80 border-cyan-500 text-cyan-300 shadow-[0_0_8px_rgba(6,182,212,0.3)]' 
+                  : 'bg-slate-800/80 hover:bg-slate-700 text-slate-200 border-slate-700 hover:border-slate-600'
+              }`}
+            >
+              <LayoutList size={14} className="text-cyan-400" />
+              <span>{mainViewMode === 'manager' ? (settings.language === 'jp' ? "ビューアに戻る" : "BACK TO VIEWER") : (settings.language === 'jp' ? "リストマネージャー" : "LIST MANAGER")}</span>
+            </button>
+
             <div className="flex gap-2">
               <button onClick={exportDataJson} className="flex-1 flex justify-center items-center gap-1 text-[10px] border border-slate-700 hover:bg-slate-800 text-slate-300 py-1.5 rounded-md transition-colors uppercase">
                 <Upload size={12} /> {t('export')}
@@ -1504,7 +1601,7 @@ export default function App() {
             </div>
             <button 
               onClick={clearAllData}
-              className="w-full flex justify-center items-center gap-2 text-[10px] border border-red-900 hover:bg-red-900/30 text-red-500 py-1.5 rounded-md transition-colors mt-1"
+              className="w-full flex justify-center items-center gap-2 text-[10px] border border-red-900 hover:bg-red-900/30 text-red-500 py-1.5 rounded-md transition-colors mt-0.5"
             >
               <Trash2 size={12} /> {t('clearAll')}
             </button>
@@ -1625,12 +1722,18 @@ export default function App() {
                   <span>{settings.theme || 'navy'}</span>
                 </button>
 
+                {/* ビューア / リスト編集マネージャー切り替えボタン */}
                 <button 
-                  onClick={() => setIsSettingsOpen(true)}
-                  className="p-1.5 text-white/90 hover:bg-white/20 hover:text-white rounded-md transition-colors shrink-0"
-                  title="設定"
+                  onClick={() => setMainViewMode(prev => prev === 'viewer' ? 'manager' : 'viewer')}
+                  className={`flex items-center gap-1.5 border text-[10px] font-bold px-2.5 py-1 rounded-md uppercase tracking-wider transition-colors shrink-0 ${
+                    mainViewMode === 'manager'
+                      ? 'bg-cyan-500 text-slate-950 border-cyan-400 shadow-[0_0_10px_rgba(6,182,212,0.6)] font-black'
+                      : 'border-white/20 text-white/90 hover:text-cyan-400 hover:border-cyan-500 hover:bg-white/10'
+                  }`}
+                  title={mainViewMode === 'manager' ? "ストリートビュー表示に戻る" : "リスト式編集マネージャーを開く"}
                 >
-                  <Settings size={15} />
+                  <LayoutList size={13} />
+                  <span>{mainViewMode === 'manager' ? t('viewModeViewer') : t('viewModeManager')}</span>
                 </button>
 
                 <button 
@@ -1659,7 +1762,7 @@ export default function App() {
                   </button>
                 )}
 
-                {/* 最右端：サイドバー位置切替トグルアイコン ＆ 全画面ボタン ＆ 別タブで開くボタン */}
+                {/* 最右端アイコン群：サイドバー位置 ＆ 全画面 ＆ 別タブ ＆ 設定 */}
                 <div className="flex items-center gap-1 border-l border-white/20 pl-2 ml-1 shrink-0">
                   <button 
                     onClick={() => saveSettings({ ...settings, sidebarPosition: settings.sidebarPosition === 'left' ? 'right' : 'left' })}
@@ -1686,6 +1789,14 @@ export default function App() {
                   >
                     <ExternalLink size={15} />
                   </a>
+
+                  <button 
+                    onClick={() => setIsSettingsOpen(true)}
+                    className="p-1.5 text-white/90 hover:bg-white/20 hover:text-cyan-400 rounded-md transition-colors border border-white/20 hover:border-white/40 shrink-0"
+                    title="設定"
+                  >
+                    <Settings size={15} />
+                  </button>
                 </div>
               </div>
             </div>
@@ -1735,7 +1846,10 @@ export default function App() {
                     onDragOver={(e) => handleTabDragOver(e, idx)}
                     onDrop={(e) => handleTabDrop(e, idx)}
                     onDragEnd={handleTabDragEnd}
-                    onClick={() => setActiveTabId(tab.id)}
+                    onClick={() => {
+                      setActiveTabId(tab.id);
+                      setMainViewMode('viewer');
+                    }}
                     className={`flex items-center gap-2 px-3 py-1.5 border text-[10px] uppercase font-mono font-bold whitespace-nowrap transition-all cursor-grab active:cursor-grabbing select-none
                       ${draggedTabIndex === idx ? 'opacity-30 scale-95 border-dashed border-cyan-400' : ''}
                       ${dragOverTabIndex === idx && draggedTabIndex !== idx ? 'border-cyan-400 bg-cyan-950/50 shadow-[inset_0_0_8px_rgba(6,182,212,0.4)] ring-1 ring-cyan-400' : ''}
@@ -1837,52 +1951,150 @@ export default function App() {
           </div>
 
           {/* Content Area */}
-          <div className="flex-1 relative bg-slate-950 overflow-hidden">
-            {(!activeTab || !currentItem) && (
-              <div className="absolute inset-0 z-20 flex flex-col items-center justify-center text-center p-8 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-slate-900 to-black">
-                <button 
-                  onClick={() => setIsSettingsOpen(true)}
-                  className="absolute top-4 right-4 p-2 text-slate-500 hover:bg-slate-800 hover:text-white rounded-md transition-colors"
-                  title="設定"
-                >
-                  <Settings size={18} />
-                </button>
-                <div className="text-6xl font-black font-mono text-white/5 tracking-tighter leading-none mb-4 uppercase">
-                  STREET VIEW
-                </div>
-                <p className="text-xs font-mono tracking-widest text-slate-500 mb-8">
-                  {t('desc')}
-                </p>
-                <button 
-                  onClick={() => fileInputRef.current?.click()}
-                  className="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-cyan-400 font-bold text-[10px] tracking-wider uppercase px-4 py-2 rounded-md transition-colors flex items-center gap-2"
-                >
-                  <Download size={14} /> {t('loadBookmark')}
-                </button>
-                
-                <div className="mt-12 p-3 bg-cyan-900/10 border border-cyan-900/30 rounded-md text-left text-[10px] font-mono text-slate-400 max-w-sm">
-                  <strong className="text-cyan-500 mb-1 block">{t('tmTitle')}</strong>
-                  {t('tmDesc1')}<br/>
-                  {t('tmDesc2')}
-                </div>
-              </div>
-            )}
+          <div 
+            className="flex-1 relative bg-slate-950 overflow-hidden"
+            style={{ 
+              marginRight: (mainViewMode === 'manager' && isSidebarOpen && settings.sidebarPosition === 'right') ? `${settings.sidebarWidth}px` : '0px',
+              marginLeft: (mainViewMode === 'manager' && isSidebarOpen && settings.sidebarPosition === 'left') ? `${settings.sidebarWidth}px` : '0px',
+            }}
+          >
+            {mainViewMode === 'manager' ? (
+              <LinkManagerView
+                locations={locations}
+                allFolders={allFolders}
+                theme={settings.theme}
+                onSelectLocation={(loc) => {
+                  handleItemClick(loc);
+                }}
+                onOpenInNewTab={(loc) => {
+                  const newTabId = crypto.randomUUID();
+                  setTabs([...tabs, { id: newTabId, location: loc }]);
+                  setActiveTabId(newTabId);
+                  setMainViewMode('viewer');
+                }}
+                onEditLocation={(loc) => {
+                  setEditTarget(loc);
+                  setIsEditModalOpen(true);
+                }}
+                onDeleteLocation={(id) => {
+                  const newLocs = locations.filter(l => l.id !== id);
+                  saveLocations(newLocs);
+                  setTabs(prev => prev.filter(t => !t.location || t.location.id !== id));
+                }}
+                onBulkDelete={(ids) => {
+                  const setIds = new Set(ids);
+                  const newLocs = locations.filter(l => !setIds.has(l.id));
+                  saveLocations(newLocs);
+                  setTabs(prev => prev.filter(t => !t.location || !setIds.has(t.location.id)));
+                }}
+                onBulkMove={(ids, targetFolder) => {
+                  const setIds = new Set(ids);
+                  const newLocs = locations.map(l => {
+                    if (setIds.has(l.id)) {
+                      return { ...l, folderName: targetFolder };
+                    }
+                    return l;
+                  });
+                  saveLocations(newLocs);
+                }}
+                onOpenSelectedInTabs={(ids) => {
+                  const setIds = new Set(ids);
+                  const selectedItems = locations.filter(loc => setIds.has(loc.id));
+                  if (selectedItems.length === 0) return;
+                  const newTabsToAdd: TabData[] = selectedItems.map(item => ({
+                    id: crypto.randomUUID(),
+                    location: item,
+                  }));
+                  let updatedTabs: TabData[];
+                  if (tabs.length === 1 && !tabs[0].location) {
+                    updatedTabs = newTabsToAdd;
+                  } else {
+                    updatedTabs = [...tabs, ...newTabsToAdd];
+                  }
+                  setTabs(updatedTabs);
+                  setActiveTabId(newTabsToAdd[0].id);
+                  setMainViewMode('viewer');
+                }}
+                onReorderItems={(newLocs) => {
+                  saveLocations(newLocs);
+                }}
+                onUpdateItem={(updated) => {
+                  const newLocs = locations.map(l => l.id === updated.id ? updated : l);
+                  saveLocations(newLocs);
+                }}
+                onRenameFolder={(oldName, newName) => {
+                  const newLocs = locations.map(l => l.folderName === oldName ? { ...l, folderName: newName } : l);
+                  saveLocations(newLocs);
+                }}
+                onDeleteFolder={(folderName) => {
+                  const newLocs = locations.filter(l => l.folderName !== folderName);
+                  saveLocations(newLocs);
+                }}
+                onAddLocation={() => {
+                  setEditTarget(null);
+                  setIsEditModalOpen(true);
+                }}
+                onCloseManager={() => {
+                  setMainViewMode('viewer');
+                }}
+                language={settings.language}
+              />
+            ) : (
+              <>
+                {(!activeTab || !currentItem) && (
+                  <div 
+                    className="absolute inset-0 z-20 flex flex-col items-center justify-center text-center p-8 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-slate-900 to-black transition-[margin] duration-150 ease-out"
+                    style={{ 
+                      marginRight: (isSidebarOpen && settings.sidebarPosition === 'right') ? `${settings.sidebarWidth}px` : '0px',
+                      marginLeft: (isSidebarOpen && settings.sidebarPosition === 'left') ? `${settings.sidebarWidth}px` : '0px',
+                    }}
+                  >
+                    <div className="text-6xl font-black font-mono text-white/5 tracking-tighter leading-none mb-4 uppercase">
+                      STREET VIEW
+                    </div>
+                    <p className="text-xs font-mono tracking-widest text-slate-500 mb-8">
+                      {t('desc')}
+                    </p>
+                    <div className="flex items-center gap-3">
+                      <button 
+                        onClick={() => fileInputRef.current?.click()}
+                        className="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-cyan-400 font-bold text-[10px] tracking-wider uppercase px-4 py-2 rounded-md transition-colors flex items-center gap-2 cursor-pointer"
+                      >
+                        <Download size={14} /> {t('loadBookmark')}
+                      </button>
+                      <button 
+                        onClick={() => setMainViewMode('manager')}
+                        className="bg-cyan-600 hover:bg-cyan-500 text-slate-950 font-bold text-[10px] tracking-wider uppercase px-4 py-2 rounded-md transition-colors flex items-center gap-2 cursor-pointer"
+                      >
+                        <LayoutList size={14} /> {settings.language === 'jp' ? "リスト管理を開く" : "OPEN MANAGER"}
+                      </button>
+                    </div>
+                    
+                    <div className="mt-12 p-3 bg-cyan-900/10 border border-cyan-900/30 rounded-md text-left text-[10px] font-mono text-slate-400 max-w-sm">
+                      <strong className="text-cyan-500 mb-1 block">{t('tmTitle')}</strong>
+                      {t('tmDesc1')}<br/>
+                      {t('tmDesc2')}
+                    </div>
+                  </div>
+                )}
 
-            {/* Render all persistent iframes */}
-            {tabs.filter(t => t.location).map(tab => (
-              <div 
-                key={tab.id}
-                className="absolute inset-0 z-10 bg-slate-950 flex items-center justify-center"
-                style={{ display: activeTabId === tab.id ? 'block' : 'none' }}
-              >
-                <div className="text-slate-600 font-mono text-xs tracking-widest absolute m-4 inset-0 flex justify-center mt-12 pointer-events-none">{t('loading')}</div>
-                <iframe 
-                  key={tab.location!.id} // force re-render ONLY if this specific tab's location changes
-                  src={getIframeUrl(tab.location!)} 
-                  className="w-full h-full border-none absolute inset-0 z-10" 
-                />
-              </div>
-            ))}
+                {/* Render all persistent iframes */}
+                {tabs.filter(t => t.location).map(tab => (
+                  <div 
+                    key={tab.id}
+                    className="absolute inset-0 z-10 bg-slate-950 flex items-center justify-center"
+                    style={{ display: activeTabId === tab.id ? 'block' : 'none' }}
+                  >
+                    <div className="text-slate-600 font-mono text-xs tracking-widest absolute m-4 inset-0 flex justify-center mt-12 pointer-events-none">{t('loading')}</div>
+                    <iframe 
+                      key={tab.location!.id} // force re-render ONLY if this specific tab's location changes
+                      src={getIframeUrl(tab.location!)} 
+                      className="w-full h-full border-none absolute inset-0 z-10" 
+                    />
+                  </div>
+                ))}
+              </>
+            )}
           </div>
         </div>
       </div>
@@ -2028,18 +2240,32 @@ export default function App() {
                 </div>
 
                 <div>
-                  <label className="text-[11px] font-bold text-slate-400 uppercase tracking-widest block mb-2">
-                    フォルダー色 (Folder Color)
-                  </label>
+                  <div className="flex justify-between items-center mb-2">
+                    <label className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">
+                      フォルダー色 (Folder Color)
+                    </label>
+                    <button 
+                      onClick={() => saveSettings({ ...settings, folderIconColor: undefined })}
+                      className="text-[10px] text-cyan-500 hover:underline font-bold"
+                    >
+                      テーマ標準色に戻す
+                    </button>
+                  </div>
                   <div className="flex items-center gap-3 bg-slate-800 rounded-md p-2 border border-slate-700">
                     <input 
                       type="color" 
-                      value={settings.folderIconColor || '#06b6d4'} 
+                      value={settings.folderIconColor || '#94a3b8'} 
                       onChange={(e) => saveSettings({ ...settings, folderIconColor: e.target.value })}
                       className="w-8 h-8 rounded border border-slate-600 bg-transparent cursor-pointer shrink-0"
                     />
-                    <div className="flex-1 flex flex-wrap gap-1.5">
-                      {['#06b6d4', '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#ec4899', '#8b5cf6', '#a1a1aa'].map(c => (
+                    <div className="flex-1 flex flex-wrap gap-1.5 items-center">
+                      <button
+                        onClick={() => saveSettings({ ...settings, folderIconColor: undefined })}
+                        className={`px-2 py-1 rounded text-[10px] font-bold border transition-colors ${!settings.folderIconColor ? 'bg-cyan-600 text-black border-cyan-500' : 'bg-slate-700 text-slate-300 border-slate-600'}`}
+                      >
+                        標準 (テーマ同調)
+                      </button>
+                      {['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#ec4899', '#8b5cf6', '#a1a1aa'].map(c => (
                         <button
                           key={c}
                           style={{ backgroundColor: c }}

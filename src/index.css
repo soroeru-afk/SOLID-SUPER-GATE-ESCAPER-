@@ -12,45 +12,77 @@
   --scrollbar-thumb-hover: rgba(255, 255, 255, 0.2);
 }
 
-/* Light Theme Overrides */
 .theme-navy {
   --color-header-bg: #000000;
   --color-overlay-bg: #000000;
 }
 
+/* Light Theme Overrides (Solid Series Standard Slate-Gray & Clean Ice Palette) */
 .theme-light {
-  --color-slate-950: #f8fafc;
-  --color-slate-900: #ffffff;
-  --color-slate-800: #e2e8f0;
-  --color-slate-700: #cbd5e1;
-  --color-slate-600: #94a3b8;
-  --color-slate-500: #475569;
-  --color-slate-400: #334155;
-  --color-slate-300: #1e293b;
-  --color-slate-200: #0f172a;
-  --color-white: #0f172a;
-  --color-black: #ffffff;
+  --color-slate-950: #f8fafc; /* メイン背景：清潔感のある白に近いオフホワイト */
+  --color-slate-900: #ffffff; /* カード・コンテナ：清潔な白 */
+  --color-slate-800: #e2e8f0; /* 枠線・サブ背景 */
+  --color-slate-700: #cbd5e1; /* 境界線 */
+  --color-slate-600: #94a3b8; 
+  --color-slate-500: #64748b; /* サブテキスト */
+  --color-slate-400: #475569; /* 通常テキスト */
+  --color-slate-300: #1e293b; /* 濃い文字 */
+  --color-slate-200: #0f172a; /* 最も濃い見出し文字 */
+  --color-slate-100: #0f172a; /* フォルダ見出しなどの濃い文字 */
+  --color-slate-50: #020617;
+  --color-white: #0f172a;    /* 反転文字 */
+  --color-black: #ffffff;    /* ボタン内の白文字 */
   
-  --color-header-bg: #f8fafc;
-  --color-overlay-bg: #0f172a;
+  --color-header-bg: #ffffff; /* 上部ヘッダー背景：白に近いクリーンなヘッダー */
+  --color-overlay-bg: #1e293b;
   
-  --scrollbar-thumb: rgba(0, 0, 0, 0.15);
-  --scrollbar-thumb-hover: rgba(0, 0, 0, 0.25);
+  --scrollbar-thumb: rgba(71, 85, 105, 0.2);
+  --scrollbar-thumb-hover: rgba(71, 85, 105, 0.35);
+
+  /* Series Authentic Accent (落ち着いた濃いスレートグレー＆洗練されたスレートブルー) */
+  --color-cyan-950: #f1f5f9;
+  --color-cyan-900: #e2e8f0;
+  --color-cyan-800: #cbd5e1;
+  --color-cyan-700: #334155; /* 濃いグレー */
+  --color-cyan-600: #475569; /* 主要アクションボタン */
+  --color-cyan-500: #475569; /* シリーズ標準の落ち着いたスレートグレーブルー */
+  --color-cyan-400: #334155; /* 濃いアクセントテキスト */
+  --color-cyan-300: #1e293b;
+  --color-cyan-200: #0f172a;
 }
 
-/* Dark Theme Overrides (Pure Black/Neutral) */
+/* Dark Theme Overrides (Neutral Dark & Slate Blue-Gray #445266 Accent) */
 .theme-dark {
-  --color-slate-950: #000000;
-  --color-slate-900: #0a0a0a;
-  --color-slate-800: #171717;
-  --color-slate-700: #262626;
-  --color-slate-600: #404040;
-  --color-slate-500: #525252;
-  --color-slate-400: #737373;
-  --color-slate-300: #a3a3a3;
-  --color-slate-200: #e5e5e5;
-  --scrollbar-thumb: rgba(255, 255, 255, 0.15);
-  --scrollbar-thumb-hover: rgba(255, 255, 255, 0.25);
+  --color-slate-950: #0f1115;
+  --color-slate-900: #181b22;
+  --color-slate-800: #262b36;
+  --color-slate-700: #363d4c;
+  --color-slate-600: #4a5468;
+  --color-slate-500: #7b889d;
+  --color-slate-400: #a2afc2;
+  --color-slate-300: #cbd5e1;
+  --color-slate-200: #e2e8f0;
+  --color-slate-100: #f1f5f9;
+  --color-slate-50: #f8fafc;
+  --color-white: #ffffff;
+  --color-black: #ffffff;
+  
+  --color-header-bg: #14171d;
+  --color-overlay-bg: #0f1115;
+
+  --scrollbar-thumb: rgba(255, 255, 255, 0.18);
+  --scrollbar-thumb-hover: rgba(255, 255, 255, 0.3);
+
+  /* Accent Color: #445266 (Slate Smoky Blue-Gray) */
+  --color-cyan-950: #151a22;
+  --color-cyan-900: #1e2632;
+  --color-cyan-800: #2b3646;
+  --color-cyan-700: #38465a;
+  --color-cyan-600: #4f5f77;
+  --color-cyan-500: #445266;
+  --color-cyan-400: #627592;
+  --color-cyan-300: #8ba0bd;
+  --color-cyan-200: #bac8dc;
 }
 
 /* Mocha Theme Overrides (Warm Dark Brown) */
@@ -64,6 +96,8 @@
   --color-slate-400: #5c4331;
   --color-slate-300: #473424;
   --color-slate-200: #332418;
+  --color-slate-100: #241911;
+  --color-slate-50: #140d08;
   --color-white: #1c130d;
   --color-black: #f5e8dc;
   
@@ -92,6 +126,8 @@
   --color-slate-400: #33261a;
   --color-slate-300: #22180e;
   --color-slate-200: #1a100a;
+  --color-slate-100: #1a100a;
+  --color-slate-50: #0f0805;
   --color-white: #0f0805;
   --color-black: #F5F0E6; /* Text color for accent buttons */
   
@@ -243,25 +279,36 @@
   -webkit-appearance: none;
   appearance: none;
   width: 100%;
-  height: 3px;
-  background: rgba(0, 0, 0, 0.4);
+  height: 4px;
+  background: #090b0e;
   border-radius: 0px !important;
   outline: none;
   margin: 0;
   padding: 0;
   cursor: pointer;
-  border: 1px solid rgba(255, 255, 255, 0.15);
+  border: 1px solid #363d4c;
+}
+
+.theme-light .solid-square-slider,
+.theme-latte .solid-square-slider {
+  background: #cbd5e1;
+  border-color: #94a3b8;
+}
+
+.theme-dark .solid-square-slider {
+  background: #0a0c10;
+  border-color: #3b4353;
 }
 
 .solid-square-slider::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
   width: 8px;
-  height: 13px;
+  height: 14px;
   background: #ffffff;
   border: 1px solid #cbd5e1;
   border-radius: 0px !important; /* 完全なソリッド四角 */
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.8);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.9);
   cursor: pointer;
 }
 
@@ -273,10 +320,10 @@
 
 .solid-square-slider::-moz-range-thumb {
   width: 8px;
-  height: 13px;
+  height: 14px;
   background: #ffffff;
   border: 1px solid #cbd5e1;
   border-radius: 0px !important;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.8);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.9);
   cursor: pointer;
 }
