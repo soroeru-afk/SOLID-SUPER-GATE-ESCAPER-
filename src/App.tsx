@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Settings, Folder, FolderOpen, File as FileIcon, X, Search, Plus, Minus, RotateCw, Trash2, Edit2, Upload, Download, Map as MapIcon, ChevronRight, ChevronLeft, ChevronsRight, ChevronsLeft, ChevronUp, ChevronDown, Menu, Check, Copy, PanelLeftClose, PanelRightClose, PanelLeftOpen, PanelRightOpen, Maximize, Minimize, Palette, Eye, EyeOff } from 'lucide-react';
+import { Settings, Folder, FolderOpen, File as FileIcon, X, Search, Plus, Minus, RotateCw, Trash2, Edit2, Upload, Download, Map as MapIcon, ChevronRight, ChevronLeft, ChevronsRight, ChevronsLeft, ChevronUp, ChevronDown, Menu, Check, Copy, PanelLeftClose, PanelRightClose, PanelLeftOpen, PanelRightOpen, PanelLeft, PanelRight, Maximize, Minimize, Palette, Eye, EyeOff } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 // === Types ===
@@ -29,6 +29,7 @@ interface AppSettings {
   language: 'jp' | 'en';
   folderIconColor?: string;
   sidebarOpacity?: number;
+  sidebarFontSize?: number;
 }
 
 interface TabData {
@@ -72,7 +73,7 @@ const translations = {
     tmDesc1: 'ブラウザ拡張等から直接場所を追加できます。',
     tmDesc2: 'ローカルストレージ sv_locations_sync を購読中。',
     captured: '撮影:',
-    currLoc: 'Current Location:',
+    currLoc: 'LOCATION:',
     newTab: '新しいタブ',
     clearAllTabs: '全て閉じる',
     fullscreen: 'フルスクリーン',
@@ -80,6 +81,7 @@ const translations = {
     hideUI: 'ヘッダーを隠す',
     showUI: 'ヘッダーを表示',
     sidebarOpacity: 'サイドバー透明度',
+    sidebarFontSize: 'サイドバー文字サイズ',
   },
   en: {
     viewer: 'STREET VIEW VIEWER',
@@ -116,7 +118,7 @@ const translations = {
     tmDesc1: 'Add locations directly from browser extensions.',
     tmDesc2: 'Subscribing to local storage sv_locations_sync.',
     captured: 'Captured:',
-    currLoc: 'CURRENT LOCATION:',
+    currLoc: 'LOCATION:',
     newTab: 'New Tab',
     clearAllTabs: 'CLEAR ALL',
     fullscreen: 'Fullscreen',
@@ -124,6 +126,7 @@ const translations = {
     hideUI: 'Hide UI',
     showUI: 'Show UI',
     sidebarOpacity: 'Sidebar Opacity',
+    sidebarFontSize: 'Sidebar Font Size',
   }
 };
 
@@ -210,6 +213,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   language: 'jp',
   folderIconColor: '#06b6d4',
   sidebarOpacity: 1.0,
+  sidebarFontSize: 11,
 };
 
 // === Main App Component ===
@@ -223,6 +227,10 @@ export default function App() {
   const [bulkTargetFolder, setBulkTargetFolder] = useState('');
   const [isSelectMode, setIsSelectMode] = useState(false);
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+
+  const getSidebarFontSizePx = () => {
+    return settings.sidebarFontSize || 11;
+  };
   
   const tabsContainerRef = useRef<HTMLDivElement>(null);
   const tabRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
@@ -1118,190 +1126,193 @@ export default function App() {
                 {t('noMatch')}
               </div>
             ) : (
-              hierarchicalFolders.map(parent => {
-                const isParentOpen = searchQuery ? true : !!folderState[parent.name];
-                
-                return (
-                  <div key={parent.name} className="mb-2">
-                    {/* 親フォルダ */}
-                    <div className="flex items-center group relative p-1 rounded-sm transition-colors hover:bg-slate-800/50">
-                      <button 
-                        className="flex-1 flex items-center text-slate-300 hover:text-white transition-colors text-left min-w-0"
-                        onClick={() => toggleFolder(parent.name)}
-                      >
-                        <ChevronRight size={14} className={`mr-1 transition-transform shrink-0 ${isParentOpen ? 'rotate-90' : ''}`} />
-                        <Folder size={14} className="mr-2 opacity-80 shrink-0" style={{ color: settings.folderIconColor || '#06b6d4' }} />
-                        <span className="flex-1 truncate uppercase text-[11px] font-bold tracking-wider">
-                          {parent.name}
-                        </span>
-                        <span className="text-[9px] bg-slate-800 px-1.5 rounded-sm opacity-50 shrink-0 mr-2">{parent.totalCount}</span>
-                      </button>
-                      <div className="absolute right-1 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity bg-slate-900 px-1 rounded-sm">
-                        <button onClick={(e) => editParentFolder(parent.name, e)} className="p-1 hover:text-cyan-400 text-slate-500 transition-colors cursor-pointer"><Edit2 size={12}/></button>
-                        <button onClick={(e) => deleteParentFolder(parent.name, e)} className="p-1 hover:text-red-400 text-slate-500 transition-colors cursor-pointer"><Trash2 size={12}/></button>
+              (() => {
+                const fs = getSidebarFontSizePx();
+                return hierarchicalFolders.map(parent => {
+                  const isParentOpen = searchQuery ? true : !!folderState[parent.name];
+                  
+                  return (
+                    <div key={parent.name} className="mb-2">
+                      {/* 親フォルダ */}
+                      <div className="flex items-center group relative p-1 rounded-sm transition-colors hover:bg-slate-800/50">
+                        <button 
+                          className="flex-1 flex items-center text-slate-300 hover:text-white transition-colors text-left min-w-0"
+                          onClick={() => toggleFolder(parent.name)}
+                        >
+                          <ChevronRight size={14} className={`mr-1 transition-transform shrink-0 ${isParentOpen ? 'rotate-90' : ''}`} />
+                          <Folder size={14} className="mr-2 opacity-80 shrink-0" style={{ color: settings.folderIconColor || '#06b6d4' }} />
+                          <span className="flex-1 truncate uppercase font-bold tracking-wider" style={{ fontSize: `${fs}px` }}>
+                            {parent.name}
+                          </span>
+                          <span className="text-[9px] bg-slate-800 px-1.5 rounded-sm opacity-50 shrink-0 mr-2">{parent.totalCount}</span>
+                        </button>
+                        <div className="absolute right-1 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity bg-slate-900 px-1 rounded-sm">
+                          <button onClick={(e) => editParentFolder(parent.name, e)} className="p-1 hover:text-cyan-400 text-slate-500 transition-colors cursor-pointer"><Edit2 size={12}/></button>
+                          <button onClick={(e) => deleteParentFolder(parent.name, e)} className="p-1 hover:text-red-400 text-slate-500 transition-colors cursor-pointer"><Trash2 size={12}/></button>
+                        </div>
                       </div>
-                    </div>
 
-                    {isParentOpen && (
-                      <div className="mt-1 pl-3 flex flex-col gap-1">
-                        {/* 子フォルダ */}
-                        {parent.subGroups.map(sub => {
-                          const isSubOpen = searchQuery ? true : !!folderState[sub.fullName];
-                          
-                          return (
-                            <div key={sub.fullName} className="mb-1">
-                              <div className="flex items-center group/sub relative p-1 rounded-sm transition-colors hover:bg-slate-800/30">
-                                <button 
-                                  className="flex-1 flex items-center text-slate-400 hover:text-white transition-colors text-left min-w-0"
-                                  onClick={() => toggleFolder(sub.fullName)}
-                                >
-                                  <ChevronRight size={12} className={`mr-1 transition-transform shrink-0 ${isSubOpen ? 'rotate-90' : ''}`} />
-                                  <FolderOpen size={12} className="mr-2 opacity-50 shrink-0 text-slate-400" />
-                                  <span className="flex-1 truncate text-[10px] font-bold tracking-wide">
-                                    {sub.subName}
-                                  </span>
-                                  <span className="text-[9px] bg-slate-800/50 px-1.5 rounded-sm opacity-40 shrink-0 mr-2">{sub.items.length}</span>
-                                </button>
-                                <div className="absolute right-1 flex gap-1 opacity-0 group-hover/sub:opacity-100 transition-opacity bg-slate-900 px-1 rounded-sm">
-                                  <button onClick={(e) => editFolder(sub.fullName, e)} className="p-1 hover:text-cyan-400 text-slate-500 transition-colors cursor-pointer"><Edit2 size={10}/></button>
-                                  <button onClick={(e) => deleteFolder(sub.fullName, e)} className="p-1 hover:text-red-400 text-slate-500 transition-colors cursor-pointer"><Trash2 size={10}/></button>
-                                </div>
-                              </div>
-
-                              {isSubOpen && (
-                                <div className="mt-1 flex flex-col gap-0.5 pl-4 pr-1 border-l border-slate-800/60 ml-2">
-                                  {sub.items.map(item => {
-                                    const isActive = currentItem?.id === item.id;
-                                    const isChecked = selectedIds.has(item.id);
-                                    return (
-                                      <div 
-                                        key={item.id} 
-                                        className={`
-                                          flex items-center py-1.5 px-2 rounded-sm cursor-pointer border-l-2 transition-colors group/item relative
-                                          ${isActive ? 'bg-cyan-900/20 border-cyan-500 text-cyan-400' : 'border-transparent text-slate-400 hover:bg-slate-800/50 hover:text-slate-200'}
-                                        `}
-                                        onClick={() => {
-                                          if (isSelectMode) {
-                                            const newSet = new Set(selectedIds);
-                                            if (newSet.has(item.id)) newSet.delete(item.id);
-                                            else newSet.add(item.id);
-                                            setSelectedIds(newSet);
-                                          } else {
-                                            handleItemClick(item);
-                                          }
-                                        }}
-                                      >
-                                        {isSelectMode && (
-                                          <div className="mr-3 flex items-center justify-center shrink-0">
-                                            <input 
-                                              type="checkbox" 
-                                              className="custom-checkbox pointer-events-none"
-                                              checked={isChecked}
-                                              readOnly
-                                            />
-                                          </div>
-                                        )}
-                                        <div className="flex-1 min-w-0 flex flex-col">
-                                          <span className="truncate text-xs font-semibold">{item.title}</span>
-                                          <div className="flex items-center gap-2 mt-0.5">
-                                            <span className="truncate text-[9px] opacity-60">
-                                              {item.parsed?.isValid ? `🧭 ${item.parsed.lat}, ${item.parsed.lng}` : '🗺️ 通常URL'}
-                                            </span>
-                                            {item.capturedDate && (
-                                              <span className="text-[9px] bg-slate-950/50 text-cyan-400 px-1 rounded-sm border border-slate-800 shrink-0 uppercase tracking-widest font-mono">
-                                                {item.capturedDate}
-                                              </span>
-                                            )}
-                                          </div>
-                                        </div>
-                                        <div className="absolute right-2 opacity-0 group-hover/item:opacity-100 transition-opacity flex bg-slate-900 rounded-sm">
-                                          <button 
-                                            className="hover:text-cyan-400 p-1.5 transition-colors shrink-0 disabled:opacity-50"
-                                            onClick={(e) => {
-                                              e.stopPropagation();
-                                              setEditTarget(item);
-                                              setIsEditModalOpen(true);
-                                            }}
-                                            disabled={isSelectMode}
-                                          >
-                                            <Edit2 size={12} />
-                                          </button>
-                                        </div>
-                                      </div>
-                                    );
-                                  })}
-                                </div>
-                              )}
-                            </div>
-                          );
-                        })}
-
-                        {/* 親フォルダ直下のアイテム */}
-                        {parent.directItems.map(item => {
-                          const isActive = currentItem?.id === item.id;
-                          const isChecked = selectedIds.has(item.id);
-                          return (
-                            <div 
-                              key={item.id} 
-                              className={`
-                                flex items-center py-1.5 px-2 rounded-sm cursor-pointer border-l-2 transition-colors group/item relative
-                                ${isActive ? 'bg-cyan-900/20 border-cyan-500 text-cyan-400' : 'border-transparent text-slate-400 hover:bg-slate-800/50 hover:text-slate-200'}
-                              `}
-                              onClick={() => {
-                                if (isSelectMode) {
-                                  const newSet = new Set(selectedIds);
-                                  if (newSet.has(item.id)) newSet.delete(item.id);
-                                  else newSet.add(item.id);
-                                  setSelectedIds(newSet);
-                                } else {
-                                  handleItemClick(item);
-                                }
-                              }}
-                            >
-                              {isSelectMode && (
-                                <div className="mr-3 flex items-center justify-center shrink-0">
-                                  <input 
-                                    type="checkbox" 
-                                    className="custom-checkbox pointer-events-none"
-                                    checked={isChecked}
-                                    readOnly
-                                  />
-                                </div>
-                              )}
-                              <div className="flex-1 min-w-0 flex flex-col">
-                                <span className="truncate text-xs font-semibold">{item.title}</span>
-                                <div className="flex items-center gap-2 mt-0.5">
-                                  <span className="truncate text-[9px] opacity-60">
-                                    {item.parsed?.isValid ? `🧭 ${item.parsed.lat}, ${item.parsed.lng}` : '🗺️ 通常URL'}
-                                  </span>
-                                  {item.capturedDate && (
-                                    <span className="text-[9px] bg-slate-950/50 text-cyan-400 px-1 rounded-sm border border-slate-800 shrink-0 uppercase tracking-widest font-mono">
-                                      {item.capturedDate}
+                      {isParentOpen && (
+                        <div className="mt-1 pl-3 flex flex-col gap-1">
+                          {/* 子フォルダ */}
+                          {parent.subGroups.map(sub => {
+                            const isSubOpen = searchQuery ? true : !!folderState[sub.fullName];
+                            
+                            return (
+                              <div key={sub.fullName} className="mb-1">
+                                <div className="flex items-center group/sub relative p-1 rounded-sm transition-colors hover:bg-slate-800/30">
+                                  <button 
+                                    className="flex-1 flex items-center text-slate-400 hover:text-white transition-colors text-left min-w-0"
+                                    onClick={() => toggleFolder(sub.fullName)}
+                                  >
+                                    <ChevronRight size={12} className={`mr-1 transition-transform shrink-0 ${isSubOpen ? 'rotate-90' : ''}`} />
+                                    <FolderOpen size={12} className="mr-2 opacity-50 shrink-0 text-slate-400" />
+                                    <span className="flex-1 truncate font-bold tracking-wide" style={{ fontSize: `${Math.max(9, fs - 1)}px` }}>
+                                      {sub.subName}
                                     </span>
-                                  )}
+                                    <span className="text-[9px] bg-slate-800/50 px-1.5 rounded-sm opacity-40 shrink-0 mr-2">{sub.items.length}</span>
+                                  </button>
+                                  <div className="absolute right-1 flex gap-1 opacity-0 group-hover/sub:opacity-100 transition-opacity bg-slate-900 px-1 rounded-sm">
+                                    <button onClick={(e) => editFolder(sub.fullName, e)} className="p-1 hover:text-cyan-400 text-slate-500 transition-colors cursor-pointer"><Edit2 size={10}/></button>
+                                    <button onClick={(e) => deleteFolder(sub.fullName, e)} className="p-1 hover:text-red-400 text-slate-500 transition-colors cursor-pointer"><Trash2 size={10}/></button>
+                                  </div>
+                                </div>
+
+                                {isSubOpen && (
+                                  <div className="mt-1 flex flex-col gap-0.5 pl-4 pr-1 border-l border-slate-800/60 ml-2">
+                                    {sub.items.map(item => {
+                                      const isActive = currentItem?.id === item.id;
+                                      const isChecked = selectedIds.has(item.id);
+                                      return (
+                                        <div 
+                                          key={item.id} 
+                                          className={`
+                                            flex items-center py-1.5 px-2 rounded-sm cursor-pointer border-l-2 transition-colors group/item relative
+                                            ${isActive ? 'bg-cyan-900/20 border-cyan-500 text-cyan-400' : 'border-transparent text-slate-400 hover:bg-slate-800/50 hover:text-slate-200'}
+                                          `}
+                                          onClick={() => {
+                                            if (isSelectMode) {
+                                              const newSet = new Set(selectedIds);
+                                              if (newSet.has(item.id)) newSet.delete(item.id);
+                                              else newSet.add(item.id);
+                                              setSelectedIds(newSet);
+                                            } else {
+                                              handleItemClick(item);
+                                            }
+                                          }}
+                                        >
+                                          {isSelectMode && (
+                                            <div className="mr-3 flex items-center justify-center shrink-0">
+                                              <input 
+                                                type="checkbox" 
+                                                className="custom-checkbox pointer-events-none"
+                                                checked={isChecked}
+                                                readOnly
+                                              />
+                                            </div>
+                                          )}
+                                          <div className="flex-1 min-w-0 flex flex-col">
+                                            <span className="truncate font-semibold leading-snug" style={{ fontSize: `${fs}px` }}>{item.title}</span>
+                                            <div className="flex items-center gap-2 mt-0.5">
+                                              <span className="truncate opacity-60" style={{ fontSize: `${Math.max(8, fs - 3)}px` }}>
+                                                {item.parsed?.isValid ? `🧭 ${item.parsed.lat}, ${item.parsed.lng}` : '🗺️ 通常URL'}
+                                              </span>
+                                              {item.capturedDate && (
+                                                <span className="bg-slate-950/50 text-cyan-400 px-1 rounded-sm border border-slate-800 shrink-0 uppercase tracking-widest font-mono" style={{ fontSize: `${Math.max(8, fs - 3)}px` }}>
+                                                  {item.capturedDate}
+                                                </span>
+                                              )}
+                                            </div>
+                                          </div>
+                                          <div className="absolute right-2 opacity-0 group-hover/item:opacity-100 transition-opacity flex bg-slate-900 rounded-sm">
+                                            <button 
+                                              className="hover:text-cyan-400 p-1.5 transition-colors shrink-0 disabled:opacity-50"
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                setEditTarget(item);
+                                                setIsEditModalOpen(true);
+                                              }}
+                                              disabled={isSelectMode}
+                                            >
+                                              <Edit2 size={12} />
+                                            </button>
+                                          </div>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+
+                          {/* 親フォルダ直下のアイテム */}
+                          {parent.directItems.map(item => {
+                            const isActive = currentItem?.id === item.id;
+                            const isChecked = selectedIds.has(item.id);
+                            return (
+                              <div 
+                                key={item.id} 
+                                className={`
+                                  flex items-center py-1.5 px-2 rounded-sm cursor-pointer border-l-2 transition-colors group/item relative
+                                  ${isActive ? 'bg-cyan-900/20 border-cyan-500 text-cyan-400' : 'border-transparent text-slate-400 hover:bg-slate-800/50 hover:text-slate-200'}
+                                `}
+                                onClick={() => {
+                                  if (isSelectMode) {
+                                    const newSet = new Set(selectedIds);
+                                    if (newSet.has(item.id)) newSet.delete(item.id);
+                                    else newSet.add(item.id);
+                                    setSelectedIds(newSet);
+                                  } else {
+                                    handleItemClick(item);
+                                  }
+                                }}
+                              >
+                                {isSelectMode && (
+                                  <div className="mr-3 flex items-center justify-center shrink-0">
+                                    <input 
+                                      type="checkbox" 
+                                      className="custom-checkbox pointer-events-none"
+                                      checked={isChecked}
+                                      readOnly
+                                    />
+                                  </div>
+                                )}
+                                <div className="flex-1 min-w-0 flex flex-col">
+                                  <span className="truncate font-semibold leading-snug" style={{ fontSize: `${fs}px` }}>{item.title}</span>
+                                  <div className="flex items-center gap-2 mt-0.5">
+                                    <span className="truncate opacity-60" style={{ fontSize: `${Math.max(8, fs - 3)}px` }}>
+                                      {item.parsed?.isValid ? `🧭 ${item.parsed.lat}, ${item.parsed.lng}` : '🗺️ 通常URL'}
+                                    </span>
+                                    {item.capturedDate && (
+                                      <span className="bg-slate-950/50 text-cyan-400 px-1 rounded-sm border border-slate-800 shrink-0 uppercase tracking-widest font-mono" style={{ fontSize: `${Math.max(8, fs - 3)}px` }}>
+                                        {item.capturedDate}
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                                <div className="absolute right-2 opacity-0 group-hover/item:opacity-100 transition-opacity flex bg-slate-900 rounded-sm">
+                                  <button 
+                                    className="hover:text-cyan-400 p-1.5 transition-colors shrink-0 disabled:opacity-50"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setEditTarget(item);
+                                      setIsEditModalOpen(true);
+                                    }}
+                                    disabled={isSelectMode}
+                                  >
+                                    <Edit2 size={12} />
+                                  </button>
                                 </div>
                               </div>
-                              <div className="absolute right-2 opacity-0 group-hover/item:opacity-100 transition-opacity flex bg-slate-900 rounded-sm">
-                                <button 
-                                  className="hover:text-cyan-400 p-1.5 transition-colors shrink-0 disabled:opacity-50"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setEditTarget(item);
-                                    setIsEditModalOpen(true);
-                                  }}
-                                  disabled={isSelectMode}
-                                >
-                                  <Edit2 size={12} />
-                                </button>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-                );
-              })
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  );
+                });
+              })()
             )}
           </div>
 
@@ -1416,21 +1427,19 @@ export default function App() {
           {/* Header Area (always visible to maintain height) */}
           {!isImmersive && (
             <div 
-              className="h-12 border-b border-slate-800 bg-header-bg/80 backdrop-blur-md flex items-center justify-between shrink-0 z-20 relative transition-all duration-300"
+              className="h-12 border-b border-slate-800 bg-header-bg/80 backdrop-blur-md flex items-center justify-between shrink-0 z-20 relative flex-nowrap overflow-hidden px-3 sm:px-4"
               style={{ 
                 marginRight: (isSidebarOpen && settings.sidebarPosition === 'right') ? `${settings.sidebarWidth}px` : '0px',
                 marginLeft: (isSidebarOpen && settings.sidebarPosition === 'left') ? `${settings.sidebarWidth}px` : '0px',
-                paddingRight: '24px',
-                paddingLeft: '24px',
               }}
             >
-              <div className="flex items-center gap-3 min-w-0 font-mono text-xs">
-                <span className="text-white/90 uppercase tracking-widest text-[9px]">{t('currLoc')}</span>
+              <div className="flex items-center gap-2 min-w-0 font-mono text-xs shrink overflow-hidden mr-2">
+                <span className="text-white/90 uppercase tracking-widest text-[9px] shrink-0">{t('currLoc')}</span>
                 {(activeTab && currentItem) ? (
                   <>
                     <span className="text-white truncate font-bold location-title-text">{currentItem.title}</span>
                     {currentItem.capturedDate && (
-                      <span className="bg-slate-800 border border-slate-700 text-cyan-400 px-1.5 py-0.5 rounded-sm text-[9px] shrink-0">
+                      <span className="bg-slate-800 border border-slate-700 text-cyan-400 px-1.5 py-0.5 rounded-sm text-[9px] shrink-0 hidden md:inline-block">
                         {t('captured')} {currentItem.capturedDate}
                       </span>
                     )}
@@ -1439,49 +1448,70 @@ export default function App() {
                   <span className="text-white/40 truncate font-bold">-</span>
                 )}
               </div>
-              <div className="flex gap-2 shrink-0 items-center">
+              <div className="flex gap-1.5 sm:gap-2 shrink-0 items-center flex-nowrap">
                 {isSidebarOpen && (
-                  <div className="flex items-center">
-                    <div className="flex items-center gap-2 mr-4">
-                      <span className="text-[10px] text-white/90 font-bold uppercase hidden sm:block">{t('sidebarOpacity')}</span>
+                  <div className="hidden sm:flex items-center flex-nowrap">
+                    {/* 不透明度スライダー (OPACITY) */}
+                    <div className="flex items-center gap-1.5 mr-2.5">
+                      <span className="text-[10px] text-white/90 font-bold uppercase tracking-wider hidden md:block">OPACITY</span>
                       <input 
                         type="range" 
                         min="10" 
                         max="100" 
                         value={Math.round((settings.sidebarOpacity ?? 1) * 100)} 
                         onChange={(e) => saveSettings({ ...settings, sidebarOpacity: Number(e.target.value) / 100 })}
-                        className="w-16 sm:w-24 accent-cyan-500 h-1.5 bg-black/40 rounded-lg appearance-none cursor-pointer shadow-inner border border-black/20"
+                        className="w-14 sm:w-16 solid-square-slider"
+                        title={`不透明度: ${Math.round((settings.sidebarOpacity ?? 1) * 100)}%`}
                       />
+                      <span className="text-[9px] font-mono text-cyan-400 font-bold w-5 text-right">
+                        {Math.round((settings.sidebarOpacity ?? 1) * 100)}
+                      </span>
                     </div>
                     
-                    <div className="hidden sm:block w-px h-4 bg-white/20 mr-2"></div>
-                    <div className="hidden sm:flex items-center gap-2 mr-2">
-                      <span className="text-[10px] text-white/90 font-bold uppercase tracking-wider">SIDEBAR</span>
-                      <div className="flex bg-transparent border border-white/20 rounded-[4px] p-[2px]">
-                        <button 
-                          onClick={() => saveSettings({ ...settings, sidebarPosition: 'left' })}
-                          className={`px-3 py-0.5 text-[9px] font-bold rounded-[3px] transition-colors uppercase ${settings.sidebarPosition === 'left' ? 'bg-black/60 text-white shadow-sm' : 'text-white/50 hover:text-white/80'}`}
-                        >
-                          LEFT
-                        </button>
-                        <button 
-                          onClick={() => saveSettings({ ...settings, sidebarPosition: 'right' })}
-                          className={`px-3 py-0.5 text-[9px] font-bold rounded-[3px] transition-colors uppercase ${settings.sidebarPosition === 'right' ? 'bg-black/60 text-white shadow-sm' : 'text-white/50 hover:text-white/80'}`}
-                        >
-                          RIGHT
-                        </button>
-                      </div>
+                    <div className="hidden sm:block w-px h-4 bg-white/20 mr-2.5"></div>
+
+                    {/* サイドバー幅スライダー (WIDTH) - 他と完全に同じ幅・同じスタイルのネイティブスライダー */}
+                    <div className="hidden sm:flex items-center gap-1 mr-2.5">
+                      <span className="text-[10px] text-white/90 font-bold uppercase tracking-wider">WIDTH</span>
+                      <input 
+                        type="range" 
+                        min="200" 
+                        max="550" 
+                        step="1"
+                        value={settings.sidebarWidth || 320} 
+                        onChange={(e) => saveSettings({ ...settings, sidebarWidth: Number(e.target.value) })}
+                        className="w-14 sm:w-16 solid-square-slider"
+                        title={`サイドバー幅: ${settings.sidebarWidth || 320}px`}
+                      />
+                      <span className="text-[9px] font-mono text-cyan-400 font-bold w-6 text-right">
+                        {settings.sidebarWidth || 320}
+                      </span>
                     </div>
+
+                    <div className="hidden sm:block w-px h-4 bg-white/20 mr-2.5"></div>
+
+                    {/* 文字サイズスライダー (TEXT) */}
+                    <div className="hidden sm:flex items-center gap-1 mr-2.5">
+                      <span className="text-[10px] text-white/90 font-bold uppercase tracking-wider">TEXT</span>
+                      <input 
+                        type="range" 
+                        min="10" 
+                        max="18" 
+                        step="1"
+                        value={getSidebarFontSizePx()} 
+                        onChange={(e) => saveSettings({ ...settings, sidebarFontSize: Number(e.target.value) })}
+                        className="w-14 sm:w-16 solid-square-slider"
+                        title={`文字サイズ: ${getSidebarFontSizePx()}px`}
+                      />
+                      <span className="text-[9px] font-mono text-cyan-400 font-bold w-6 text-right">
+                        {getSidebarFontSizePx()}P
+                      </span>
+                    </div>
+
                     <div className="hidden sm:block w-px h-4 bg-white/20 mr-2"></div>
                   </div>
                 )}
-                <button 
-                  onClick={toggleFullscreen}
-                  className="p-1.5 text-white/90 hover:bg-white/20 hover:text-white rounded-md transition-colors"
-                  title={isFullscreen ? t('exitFullscreen') : t('fullscreen')}
-                >
-                  {isFullscreen ? <Minimize size={16} /> : <Maximize size={16} />}
-                </button>
+
                 <button 
                   onClick={() => {
                     const themes = ['navy', 'dark', 'light', 'mocha', 'latte'] as const;
@@ -1489,42 +1519,65 @@ export default function App() {
                     const nextTheme = themes[(currentIndex + 1) % themes.length];
                     saveSettings({ ...settings, theme: nextTheme });
                   }}
-                  className="flex items-center gap-1.5 border border-white/20 hover:border-cyan-500 hover:bg-white/10 text-[10px] text-white/90 hover:text-cyan-400 font-bold px-2 py-1 rounded-md uppercase tracking-wider transition-colors shrink-0"
-                  title="テーマ切り替え"
+                  className="flex items-center justify-center gap-1.5 border border-white/20 hover:border-cyan-500 hover:bg-white/10 text-[10px] text-white/90 hover:text-cyan-400 font-bold px-2 py-1 rounded-md uppercase tracking-wider transition-colors shrink-0 w-[78px]"
+                  title={`テーマ切り替え: ${(settings.theme || 'navy').toUpperCase()}`}
                 >
-                  <Palette size={12} /> THEME: {settings.theme || 'navy'}
+                  <Palette size={12} className="shrink-0" />
+                  <span>{settings.theme || 'navy'}</span>
                 </button>
+
                 <button 
                   onClick={() => setIsSettingsOpen(true)}
-                  className="p-1.5 text-white/90 hover:bg-white/20 hover:text-white rounded-md transition-colors"
+                  className="p-1.5 text-white/90 hover:bg-white/20 hover:text-white rounded-md transition-colors shrink-0"
                   title="設定"
                 >
-                  <Settings size={16} />
+                  <Settings size={15} />
                 </button>
+
                 <button 
                   onClick={() => setIsImmersive(true)}
-                  className="flex items-center gap-1.5 border border-white/20 hover:border-cyan-500 hover:bg-white/10 text-[10px] text-white/90 hover:text-cyan-400 font-bold px-2.5 py-1 rounded-md uppercase tracking-wider transition-colors shrink-0"
+                  className="flex items-center gap-1 border border-white/20 hover:border-cyan-500 hover:bg-white/10 text-[10px] text-white/90 hover:text-cyan-400 font-bold px-2 py-1 rounded-md uppercase tracking-wider transition-colors shrink-0"
                   title="UIを非表示 (Hide UI)"
                 >
-                  <EyeOff size={13} /> HIDE UI
+                  <EyeOff size={12} /> <span className="hidden lg:inline">HIDE UI</span>
                 </button>
+
                 {(activeTab && currentItem) ? (
                   <a 
                     href={currentItem.url} 
                     target="_blank" 
                     rel="noreferrer"
-                    className="flex items-center gap-1.5 bg-transparent border border-white/40 hover:border-white hover:bg-white/10 text-white font-bold text-[10px] px-3 py-1.5 rounded-md uppercase tracking-wider transition-colors open-map-btn"
+                    className="flex items-center gap-1 bg-transparent border border-white/40 hover:border-white hover:bg-white/10 text-white font-bold text-[10px] px-2 py-1 rounded-md uppercase tracking-wider transition-colors open-map-btn shrink-0"
                   >
-                    <MapIcon size={12} /> {t('openMap')}
+                    <MapIcon size={12} /> <span className="hidden lg:inline">{t('openMap')}</span>
                   </a>
                 ) : (
                   <button 
                     disabled
-                    className="flex items-center gap-1.5 bg-transparent border border-slate-800 text-slate-600 font-bold text-[10px] px-3 py-1.5 rounded-md uppercase tracking-wider cursor-not-allowed"
+                    className="flex items-center gap-1 bg-transparent border border-slate-800 text-slate-600 font-bold text-[10px] px-2 py-1 rounded-md uppercase tracking-wider cursor-not-allowed shrink-0"
                   >
-                    <MapIcon size={12} /> {t('openMap')}
+                    <MapIcon size={12} /> <span className="hidden lg:inline">{t('openMap')}</span>
                   </button>
                 )}
+
+                {/* 最右端：サイドバー位置切替トグルアイコン ＆ 全画面ボタン */}
+                <div className="flex items-center gap-1 border-l border-white/20 pl-2 ml-1 shrink-0">
+                  <button 
+                    onClick={() => saveSettings({ ...settings, sidebarPosition: settings.sidebarPosition === 'left' ? 'right' : 'left' })}
+                    className="p-1.5 text-white/90 hover:bg-white/20 hover:text-cyan-400 rounded-md transition-colors border border-white/20 hover:border-white/40"
+                    title={`サイドバー位置切替 (現在: ${settings.sidebarPosition === 'left' ? '左' : '右'} / クリックで${settings.sidebarPosition === 'left' ? '右' : '左'}側へ移動)`}
+                  >
+                    {settings.sidebarPosition === 'left' ? <PanelLeft size={15} /> : <PanelRight size={15} />}
+                  </button>
+
+                  <button 
+                    onClick={toggleFullscreen}
+                    className="p-1.5 text-white/90 hover:bg-white/20 hover:text-white rounded-md transition-colors border border-white/20 hover:border-white/40"
+                    title={isFullscreen ? t('exitFullscreen') : t('fullscreen')}
+                  >
+                    {isFullscreen ? <Minimize size={15} /> : <Maximize size={15} />}
+                  </button>
+                </div>
               </div>
             </div>
           )}
