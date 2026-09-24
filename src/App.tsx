@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Settings, Folder, FolderOpen, Folders, File as FileIcon, X, Search, Plus, Minus, RotateCw, Trash2, Edit2, Upload, Download, Map as MapIcon, ChevronRight, ChevronLeft, ChevronsRight, ChevronsLeft, ChevronUp, ChevronDown, Menu, Check, Copy, PanelLeftClose, PanelRightClose, PanelLeftOpen, PanelRightOpen, PanelLeft, PanelRight, Maximize, Minimize, Palette, Eye, EyeOff, ExternalLink, LayoutList, GripVertical, ArrowUp, ArrowDown, Layers, Compass } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { LinkManagerView } from './components/LinkManagerView';
+import { LinkManagerView, openInCenteredWindow } from './components/LinkManagerView';
 
 // === Types ===
 interface LocationItem {
@@ -251,7 +251,7 @@ export default function App() {
   const [activeTabId, setActiveTabId] = useState<string | null>(null);
   const [bulkTargetFolder, setBulkTargetFolder] = useState('');
   const [isSelectMode, setIsSelectMode] = useState(false);
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+  const [sortOrder, setSortOrder] = useState<'custom' | 'asc' | 'desc'>('custom');
   
   const tabsContainerRef = useRef<HTMLDivElement>(null);
   const tabRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
@@ -551,6 +551,7 @@ export default function App() {
 
   // マネージャー内でのアイテム上下並び替え関数
   const moveItemOrder = (itemId: string, direction: 'up' | 'down') => {
+    setSortOrder('custom');
     const currentIndex = locations.findIndex(loc => loc.id === itemId);
     if (currentIndex === -1) return;
 
@@ -584,6 +585,7 @@ export default function App() {
       setDraggedManagerId(null);
       return;
     }
+    setSortOrder('custom');
     const fromIndex = locations.findIndex(l => l.id === draggedManagerId);
     const toIndex = locations.findIndex(l => l.id === targetId);
     if (fromIndex === -1 || toIndex === -1) {
@@ -827,12 +829,12 @@ export default function App() {
     } catch(e) {}
   };
 
-  // Update browser theme-color meta tag dynamically based on the current theme
+  // Update browser theme-color meta tag dynamically based on the current theme (precisely matching header background colors)
   useEffect(() => {
     const themeColors = {
       navy: '#000000',
-      dark: '#000000',
-      light: '#f8fafc',
+      dark: '#14171d',  // ダークモード時のサイドバー・ヘッダー背景色 --color-header-bg (#14171d) に完全同期
+      light: '#ffffff', // ライトモード時のサイドバー・ヘッダー背景色 --color-header-bg (#ffffff) に完全同期
       mocha: '#59483A',
       latte: '#9E8668',
     };
@@ -898,11 +900,14 @@ export default function App() {
       );
     }
     
-    // Sort items by title
-    filtered.sort((a, b) => {
-      const cmp = a.title.localeCompare(b.title);
-      return sortOrder === 'asc' ? cmp : -cmp;
-    });
+    // ソート処理:
+    // 'custom'（デフォルト）の場合は locations 配列の並び順（リスト管理画面での並び順）をそのまま保持！
+    // 'asc' または 'desc' の場合のみタイトルで名前順ソート
+    if (sortOrder === 'asc') {
+      filtered.sort((a, b) => a.title.localeCompare(b.title));
+    } else if (sortOrder === 'desc') {
+      filtered.sort((a, b) => b.title.localeCompare(a.title));
+    }
 
     const groups: Record<string, LocationItem[]> = {};
     filtered.forEach(item => {
@@ -1386,13 +1391,24 @@ export default function App() {
               </div>
             </div>
 
-            {/* 下段: 名前順ソート ＆ 選択 ＆ 展開・縮小・リフレッシュ */}
+            {/* 下段: 並び順ソート切り替え ＆ 選択 ＆ 展開・縮小・リフレッシュ */}
             <div className="flex items-center justify-between">
               <button 
-                onClick={() => setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')} 
-                className="flex items-center gap-0.5 hover:text-slate-200 transition-colors whitespace-nowrap font-bold cursor-pointer"
+                onClick={() => setSortOrder(prev => {
+                  if (prev === 'custom') return 'asc';
+                  if (prev === 'asc') return 'desc';
+                  return 'custom';
+                })} 
+                className={`flex items-center gap-1 hover:text-slate-200 transition-colors whitespace-nowrap font-bold cursor-pointer ${sortOrder === 'custom' ? 'text-cyan-400' : 'text-slate-300'}`}
+                title={
+                  sortOrder === 'custom'
+                    ? 'リスト管理の並び順で表示中 (クリックで名前順昇順)'
+                    : sortOrder === 'asc'
+                    ? '名前順 (昇順) で表示中 (クリックで名前順降順)'
+                    : '名前順 (降順) で表示中 (クリックでリスト管理の並び順に戻す)'
+                }
               >
-                名前順 {sortOrder === 'asc' ? '▼' : '▲'}
+                {sortOrder === 'custom' ? '並び順 (同期中)' : sortOrder === 'asc' ? '名前順 ▼' : '名前順 ▲'}
               </button>
 
               <div className="flex items-center gap-1.5 shrink-0">
@@ -2179,11 +2195,11 @@ export default function App() {
                 onSelectLocation={(loc) => {
                   handleItemClick(loc);
                 }}
+                onOpenInNewWindow={(loc) => {
+                  openInCenteredWindow(loc.url, 1920, 1100);
+                }}
                 onOpenInNewTab={(loc) => {
-                  const newTabId = crypto.randomUUID();
-                  setTabs([...tabs, { id: newTabId, location: loc }]);
-                  setActiveTabId(newTabId);
-                  setMainViewMode('viewer');
+                  openInCenteredWindow(loc.url, 1920, 1100);
                 }}
                 onEditLocation={(loc) => {
                   setEditTarget(loc);
@@ -2229,6 +2245,7 @@ export default function App() {
                   setMainViewMode('viewer');
                 }}
                 onReorderItems={(newLocs) => {
+                  setSortOrder('custom');
                   saveLocations(newLocs);
                 }}
                 onUpdateItem={(updated) => {

@@ -27,6 +27,69 @@ export interface LocationItem {
   };
 }
 
+// === 新しいウィンドウをモニター中央 (1920×1100) で開くユーティリティ ===
+export const openInCenteredWindow = (url: string, width = 1920, height = 1100) => {
+  if (!url) return;
+
+  // 1. モニターの利用可能領域を取得 (iframe内のinnerHeightではなく、モニター自体の解像度を使用)
+  const screenObj = typeof window !== 'undefined' ? (window.screen as any) : null;
+  const availW = screenObj?.availWidth || screenObj?.width || 1920;
+  const availH = screenObj?.availHeight || screenObj?.height || 1080;
+
+  // モニターの有効高さに収まるように調整 (フルHD 1080p環境でも上下にマージンを残して完全中央配置)
+  const targetW = Math.min(width, availW);
+  const targetH = Math.min(height, Math.max(600, availH - 60));
+
+  // 2. 現在のウィンドウが存在するモニターの左上原点 (マルチモニター対応)
+  let monitorLeft = 0;
+  let monitorTop = 0;
+
+  if (screenObj && typeof screenObj.availLeft === 'number' && typeof screenObj.availTop === 'number') {
+    // Chrome / Edge などの最新マルチモニター座標
+    monitorLeft = screenObj.availLeft;
+    monitorTop = screenObj.availTop;
+  } else {
+    // フォールバック: 現在のウィンドウ位置からモニター基点を算出
+    const currentX = window.screenLeft !== undefined ? window.screenLeft : (window.screenX || 0);
+    const currentY = window.screenTop !== undefined ? window.screenTop : (window.screenY || 0);
+    
+    // 現在のウィンドウ中心があるモニターの原点を計算
+    const windowCenterX = currentX + (window.outerWidth || availW) / 2;
+    const windowCenterY = currentY + (window.outerHeight || availH) / 2;
+    monitorLeft = Math.floor(windowCenterX / availW) * availW;
+    monitorTop = Math.floor(windowCenterY / availH) * availH;
+  }
+
+  // 3. モニターの中央座標 (left, top) を算出
+  const left = Math.round(monitorLeft + (availW - targetW) / 2);
+  const top = Math.round(monitorTop + (availH - targetH) / 2);
+
+  const features = [
+    `width=${targetW}`,
+    `height=${targetH}`,
+    `left=${left}`,
+    `top=${top}`,
+    'resizable=yes',
+    'scrollbars=yes',
+    'status=yes',
+    'menubar=no',
+    'toolbar=no',
+    'location=yes'
+  ].join(',');
+
+  const win = window.open(url, '_blank', features);
+  if (win) {
+    try {
+      // featuresの座標に加えてmoveTo/resizeToも実行して確実に中央配置
+      win.moveTo(left, top);
+      win.resizeTo(targetW, targetH);
+      win.focus();
+    } catch {
+      win.focus();
+    }
+  }
+};
+
 interface LinkManagerViewProps {
   locations: LocationItem[];
   allFolders: string[];
@@ -35,7 +98,8 @@ interface LinkManagerViewProps {
   onReorderParentFolders?: (newOrder: string[]) => void;
   theme?: string;
   onSelectLocation: (loc: LocationItem) => void;
-  onOpenInNewTab: (loc: LocationItem) => void;
+  onOpenInNewTab?: (loc: LocationItem) => void;
+  onOpenInNewWindow?: (loc: LocationItem) => void;
   onEditLocation: (loc: LocationItem) => void;
   onDeleteLocation: (id: string) => void;
   onBulkDelete: (ids: string[]) => void;
@@ -62,6 +126,7 @@ export const LinkManagerView: React.FC<LinkManagerViewProps> = ({
   onUpdateListFontSize,
   onSelectLocation,
   onOpenInNewTab,
+  onOpenInNewWindow,
   onEditLocation,
   onDeleteLocation,
   onBulkDelete,
@@ -311,59 +376,81 @@ export const LinkManagerView: React.FC<LinkManagerViewProps> = ({
     }
   };
 
+  // 表示中リスト (filteredItems) での並び替え順序を locations 全体に正確に適用・保存する
+  const applyReorderedFilteredItems = (newFiltered: LocationItem[]) => {
+    // 現在の locations において filteredItems に属するアイテムのインデックス位置を収集
+    const filteredIdSet = new Set(filteredItems.map(f => f.id));
+    const indices: number[] = [];
+    locations.forEach((item, index) => {
+      if (filteredIdSet.has(item.id)) {
+        indices.push(index);
+      }
+    });
+
+    const newLocations = [...locations];
+    // 収集したインデックス位置に、新しく並び替えたアイテムを順番に格納
+    indices.forEach((locIndex, i) => {
+      if (i < newFiltered.length) {
+        newLocations[locIndex] = newFiltered[i];
+      }
+    });
+
+    onReorderItems(newLocations);
+  };
+
   // === 複数選択された項目の上下移動（Kナビゲーター方式） ===
   const moveSelectedUp = () => {
     if (selectedIds.size === 0) return;
-    const newItems = [...locations];
-    for (let i = 1; i < newItems.length; i++) {
-      if (selectedIds.has(newItems[i].id) && !selectedIds.has(newItems[i - 1].id)) {
-        const temp = newItems[i];
-        newItems[i] = newItems[i - 1];
-        newItems[i - 1] = temp;
+    const newFiltered = [...filteredItems];
+    for (let i = 1; i < newFiltered.length; i++) {
+      if (selectedIds.has(newFiltered[i].id) && !selectedIds.has(newFiltered[i - 1].id)) {
+        const temp = newFiltered[i];
+        newFiltered[i] = newFiltered[i - 1];
+        newFiltered[i - 1] = temp;
       }
     }
-    onReorderItems(newItems);
+    applyReorderedFilteredItems(newFiltered);
   };
 
   const moveSelectedDown = () => {
     if (selectedIds.size === 0) return;
-    const newItems = [...locations];
-    for (let i = newItems.length - 2; i >= 0; i--) {
-      if (selectedIds.has(newItems[i].id) && !selectedIds.has(newItems[i + 1].id)) {
-        const temp = newItems[i];
-        newItems[i] = newItems[i + 1];
-        newItems[i + 1] = temp;
+    const newFiltered = [...filteredItems];
+    for (let i = newFiltered.length - 2; i >= 0; i--) {
+      if (selectedIds.has(newFiltered[i].id) && !selectedIds.has(newFiltered[i + 1].id)) {
+        const temp = newFiltered[i];
+        newFiltered[i] = newFiltered[i + 1];
+        newFiltered[i + 1] = temp;
       }
     }
-    onReorderItems(newItems);
+    applyReorderedFilteredItems(newFiltered);
   };
 
   const moveSelectedToTop = () => {
     if (selectedIds.size === 0) return;
     const selected: LocationItem[] = [];
     const unselected: LocationItem[] = [];
-    for (const item of locations) {
+    for (const item of filteredItems) {
       if (selectedIds.has(item.id)) {
         selected.push(item);
       } else {
         unselected.push(item);
       }
     }
-    onReorderItems([...selected, ...unselected]);
+    applyReorderedFilteredItems([...selected, ...unselected]);
   };
 
   const moveSelectedToBottom = () => {
     if (selectedIds.size === 0) return;
     const selected: LocationItem[] = [];
     const unselected: LocationItem[] = [];
-    for (const item of locations) {
+    for (const item of filteredItems) {
       if (selectedIds.has(item.id)) {
         selected.push(item);
       } else {
         unselected.push(item);
       }
     }
-    onReorderItems([...unselected, ...selected]);
+    applyReorderedFilteredItems([...unselected, ...selected]);
   };
 
   // ドラッグ＆ドロップ処理
@@ -389,14 +476,14 @@ export const LinkManagerView: React.FC<LinkManagerViewProps> = ({
       return;
     }
 
-    const fromIndex = locations.findIndex(item => item.id === draggedId);
-    const toIndex = locations.findIndex(item => item.id === targetId);
+    const fromIndex = filteredItems.findIndex(item => item.id === draggedId);
+    const toIndex = filteredItems.findIndex(item => item.id === targetId);
 
     if (fromIndex !== -1 && toIndex !== -1) {
-      const newItems = [...locations];
-      const [movedItem] = newItems.splice(fromIndex, 1);
-      newItems.splice(toIndex, 0, movedItem);
-      onReorderItems(newItems);
+      const newFiltered = [...filteredItems];
+      const [movedItem] = newFiltered.splice(fromIndex, 1);
+      newFiltered.splice(toIndex, 0, movedItem);
+      applyReorderedFilteredItems(newFiltered);
     }
 
     setDraggedId(null);
@@ -1165,9 +1252,17 @@ export const LinkManagerView: React.FC<LinkManagerViewProps> = ({
                           <Compass size={14} />
                         </button>
                         <button
-                          onClick={() => onOpenInNewTab(item)}
-                          className="p-1.5 rounded transition-colors cursor-pointer text-slate-400 hover:text-white hover:bg-slate-800 shrink-0"
-                          title="新しいタブで開く"
+                          onClick={() => {
+                            if (onOpenInNewWindow) {
+                              onOpenInNewWindow(item);
+                            } else if (onOpenInNewTab) {
+                              onOpenInNewTab(item);
+                            } else {
+                              openInCenteredWindow(item.url, 1920, 1100);
+                            }
+                          }}
+                          className="p-1.5 rounded transition-colors cursor-pointer text-slate-400 hover:text-cyan-400 hover:bg-slate-800 shrink-0"
+                          title={language === 'jp' ? "新しいウィンドウで開く (1920×1100 センター表示)" : "Open in new window (1920x1100 centered)"}
                         >
                           <ExternalLink size={14} />
                         </button>
