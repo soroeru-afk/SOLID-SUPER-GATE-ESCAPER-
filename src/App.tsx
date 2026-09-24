@@ -82,6 +82,11 @@ const translations = {
     showUI: 'ヘッダーを表示',
     sidebarOpacity: 'サイドバー透明度',
     sidebarFontSize: 'サイドバー文字サイズ',
+    select: '選択',
+    selectDone: '完了',
+    selectAll: '全選択',
+    deselectAll: '全解除',
+    openInTabs: '選択項目をタブ化して開く',
   },
   en: {
     viewer: 'STREET VIEW VIEWER',
@@ -127,6 +132,11 @@ const translations = {
     showUI: 'Show UI',
     sidebarOpacity: 'Sidebar Opacity',
     sidebarFontSize: 'Sidebar Font Size',
+    select: 'SELECT',
+    selectDone: 'DONE',
+    selectAll: 'SELECT ALL',
+    deselectAll: 'DESELECT ALL',
+    openInTabs: 'Open Selected in Tabs',
   }
 };
 
@@ -949,6 +959,29 @@ export default function App() {
     setSelectedIds(new Set());
   };
 
+  const openSelectedInTabs = () => {
+    if (selectedIds.size === 0) return;
+    const selectedItems = locations.filter(loc => selectedIds.has(loc.id));
+    if (selectedItems.length === 0) return;
+
+    const newTabsToAdd: TabData[] = selectedItems.map(item => ({
+      id: crypto.randomUUID(),
+      location: item,
+    }));
+
+    let updatedTabs: TabData[];
+    if (tabs.length === 1 && !tabs[0].location) {
+      updatedTabs = newTabsToAdd;
+    } else {
+      updatedTabs = [...tabs, ...newTabsToAdd];
+    }
+
+    setTabs(updatedTabs);
+    setActiveTabId(newTabsToAdd[0].id);
+    setSelectedIds(new Set());
+    setIsSelectMode(false);
+  };
+
   const editParentFolder = async (parentName: string, e: React.MouseEvent) => {
     e.stopPropagation();
     const newName = await customPrompt('新しい親フォルダ名を入力してください', parentName);
@@ -1121,26 +1154,51 @@ export default function App() {
 
           {/* === Toolbar === */}
           <div className="flex items-center justify-between text-[10px] font-mono text-slate-500 bg-slate-900/10 px-4 py-2 border-b border-slate-800 shrink-0">
-            <div className="flex items-center gap-4">
-              <span className="font-bold tracking-widest">{locations.length} FILES</span>
+            <div className="flex items-center gap-3 min-w-0">
+              <span className="font-bold tracking-widest shrink-0">{locations.length} FILES</span>
               <button 
                 onClick={() => setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')} 
-                className="flex items-center gap-1 hover:text-slate-300 transition-colors whitespace-nowrap font-bold"
+                className="flex items-center gap-1 hover:text-slate-300 transition-colors whitespace-nowrap font-bold shrink-0"
               >
                 名前順 {sortOrder === 'asc' ? '▼' : '▲'}
               </button>
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 shrink-0">
+              {isSelectMode && locations.length > 0 && (
+                <button
+                  onClick={() => {
+                    if (selectedIds.size === locations.length) {
+                      setSelectedIds(new Set());
+                    } else {
+                      setSelectedIds(new Set(locations.map(l => l.id)));
+                    }
+                  }}
+                  className="hover:text-slate-200 transition-colors text-[9px] font-bold text-slate-400 hover:text-white uppercase whitespace-nowrap"
+                  title={selectedIds.size === locations.length ? t('deselectAll') : t('selectAll')}
+                >
+                  {selectedIds.size === locations.length ? t('deselectAll') : t('selectAll')}
+                </button>
+              )}
+              {isSelectMode && selectedIds.size > 0 && (
+                <button 
+                  onClick={openSelectedInTabs}
+                  className="flex items-center gap-1 bg-cyan-600 hover:bg-cyan-500 text-black text-[9px] font-bold px-2 py-0.5 rounded-full transition-colors uppercase tracking-wider shrink-0 cursor-pointer shadow-sm"
+                  title="選択した項目をすべてタブで開く"
+                >
+                  <FolderOpen size={10} />
+                  <span>{settings.language === 'jp' ? `タブ化 (${selectedIds.size})` : `TABS (${selectedIds.size})`}</span>
+                </button>
+              )}
               <button 
                 onClick={() => {
                   setIsSelectMode(!isSelectMode);
                   if (isSelectMode) setSelectedIds(new Set()); // モード切替時に選択リセット
                 }} 
-                className={`transition-colors whitespace-nowrap px-3 py-0.5 rounded-full border border-transparent font-bold tracking-wider ${isSelectMode ? 'bg-cyan-900/30 text-cyan-400 border-cyan-800 text-[9px]' : 'bg-slate-800/80 hover:bg-slate-700 hover:text-slate-300 text-[9px]'}`}
+                className={`transition-colors whitespace-nowrap px-2.5 py-0.5 rounded-full border font-bold tracking-wider uppercase text-[10px] cursor-pointer ${isSelectMode ? 'bg-cyan-900/40 text-cyan-300 border-cyan-500/80 shadow-[0_0_8px_rgba(6,182,212,0.3)]' : 'bg-slate-800/80 hover:bg-slate-700 hover:text-white text-slate-300 border-slate-700'}`}
               >
-                {isSelectMode ? 'Done' : 'Select'}
+                {isSelectMode ? t('selectDone') : t('select')}
               </button>
-              <div className="flex items-center gap-2.5">
+              <div className="flex items-center gap-2 ml-1">
                 <button 
                   onClick={() => setFolderState(allFolders.reduce((acc, k) => ({...acc, [k]: true}), {}))} 
                   className="hover:text-slate-300 transition-colors opacity-70 hover:opacity-100" 
@@ -1393,6 +1451,16 @@ export default function App() {
                     </button>
                   </div>
                 </div>
+
+                {/* 選択した項目を一括でタブ化して開くボタン */}
+                <button
+                  onClick={openSelectedInTabs}
+                  className="w-full flex items-center justify-center gap-1.5 py-1.5 px-3 bg-cyan-600 hover:bg-cyan-500 text-black text-xs font-bold rounded shadow transition-colors uppercase tracking-wider cursor-pointer"
+                  title="選択したすべての場所を別々のタブとして展開"
+                >
+                  <FolderOpen size={14} />
+                  <span>{settings.language === 'jp' ? `選択した ${selectedIds.size} 件をタブ化して開く` : `Open ${selectedIds.size} in Tabs`}</span>
+                </button>
                 <div className="flex gap-2 items-center mt-1">
                   <select 
                     value={bulkTargetFolder}
