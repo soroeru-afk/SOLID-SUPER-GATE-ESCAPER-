@@ -1470,26 +1470,6 @@ export default function App() {
                     
                     <div className="hidden sm:block w-px h-4 bg-white/20 mr-2.5"></div>
 
-                    {/* サイドバー幅スライダー (WIDTH) - 他と完全に同じ幅・同じスタイルのネイティブスライダー */}
-                    <div className="hidden sm:flex items-center gap-1 mr-2.5">
-                      <span className="text-[10px] text-white/90 font-bold uppercase tracking-wider">WIDTH</span>
-                      <input 
-                        type="range" 
-                        min="200" 
-                        max="550" 
-                        step="1"
-                        value={settings.sidebarWidth || 320} 
-                        onChange={(e) => saveSettings({ ...settings, sidebarWidth: Number(e.target.value) })}
-                        className="w-14 sm:w-16 solid-square-slider"
-                        title={`サイドバー幅: ${settings.sidebarWidth || 320}px`}
-                      />
-                      <span className="text-[9px] font-mono text-cyan-400 font-bold w-6 text-right">
-                        {settings.sidebarWidth || 320}
-                      </span>
-                    </div>
-
-                    <div className="hidden sm:block w-px h-4 bg-white/20 mr-2.5"></div>
-
                     {/* 文字サイズスライダー (TEXT) */}
                     <div className="hidden sm:flex items-center gap-1 mr-2.5">
                       <span className="text-[10px] text-white/90 font-bold uppercase tracking-wider">TEXT</span>
