@@ -225,7 +225,6 @@
   border-color: rgba(0, 0, 0, 0.4) !important;
 }
 
-
 /* Fix language toggle in Mocha header to use Latte theme colors */
 .theme-mocha .lang-toggle-container {
   --color-slate-400: #33261a;
@@ -256,7 +255,7 @@
   height: 13px;
   background: #ffffff;
   border: 1px solid #cbd5e1;
-  border-radius: 0px !important;
+  border-radius: 0px !important; /* 完全なソリッド四角 */
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.8);
   cursor: pointer;
 }
@@ -276,4 +275,3 @@
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.8);
   cursor: pointer;
 }
-

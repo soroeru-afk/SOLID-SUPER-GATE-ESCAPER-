@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Settings, Folder, FolderOpen, File as FileIcon, X, Search, Plus, Minus, RotateCw, Trash2, Edit2, Upload, Download, Map as MapIcon, ChevronRight, ChevronLeft, ChevronsRight, ChevronsLeft, ChevronUp, ChevronDown, Menu, Check, Copy, PanelLeftClose, PanelRightClose, PanelLeftOpen, PanelRightOpen, PanelLeft, PanelRight, Maximize, Minimize, Palette, Eye, EyeOff } from 'lucide-react';
+import { Settings, Folder, FolderOpen, File as FileIcon, X, Search, Plus, Minus, RotateCw, Trash2, Edit2, Upload, Download, Map as MapIcon, ChevronRight, ChevronLeft, ChevronsRight, ChevronsLeft, ChevronUp, ChevronDown, Menu, Check, Copy, PanelLeftClose, PanelRightClose, PanelLeftOpen, PanelRightOpen, PanelLeft, PanelRight, Maximize, Minimize, Palette, Eye, EyeOff, ExternalLink } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 // === Types ===
@@ -213,7 +213,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   language: 'jp',
   folderIconColor: '#06b6d4',
   sidebarOpacity: 1.0,
-  sidebarFontSize: 11,
+  sidebarFontSize: 12,
 };
 
 // === Main App Component ===
@@ -227,10 +227,6 @@ export default function App() {
   const [bulkTargetFolder, setBulkTargetFolder] = useState('');
   const [isSelectMode, setIsSelectMode] = useState(false);
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
-
-  const getSidebarFontSizePx = () => {
-    return settings.sidebarFontSize || 11;
-  };
   
   const tabsContainerRef = useRef<HTMLDivElement>(null);
   const tabRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
@@ -430,8 +426,58 @@ export default function App() {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<LocationItem | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isResizingSidebar, setIsResizingSidebar] = useState(false);
+
+  // 境界線グリップハンドルのドラッグによるサイドバー幅変更処理（左右どちらでも完璧にリアルタイム追従）
+  const handleBoundaryPointerDown = (e: React.PointerEvent) => {
+    e.preventDefault();
+    const startX = e.clientX;
+    const startWidth = settings.sidebarWidth || 320;
+    let hasMoved = false;
+    setIsResizingSidebar(true);
+
+    const onPointerMove = (ev: PointerEvent) => {
+      const deltaX = ev.clientX - startX;
+      if (Math.abs(deltaX) > 2) {
+        hasMoved = true;
+      }
+      let newW: number;
+      if (settings.sidebarPosition === 'right') {
+        newW = Math.round(startWidth - deltaX);
+      } else {
+        newW = Math.round(startWidth + deltaX);
+      }
+      const maxAvailable = Math.max(300, window.innerWidth - 80);
+      newW = Math.max(180, Math.min(Math.min(650, maxAvailable), newW));
+      saveSettings({ ...settings, sidebarWidth: newW });
+    };
+
+    const onPointerUp = () => {
+      window.removeEventListener('pointermove', onPointerMove);
+      window.removeEventListener('pointerup', onPointerUp);
+      setIsResizingSidebar(false);
+      // ドラッグせずにクリックだけした場合は開閉をトグル
+      if (!hasMoved) {
+        setIsSidebarOpen(prev => !prev);
+      }
+    };
+
+    window.addEventListener('pointermove', onPointerMove);
+    window.addEventListener('pointerup', onPointerUp);
+  };
 
   const t = (key: keyof typeof translations.jp) => translations[settings.language][key];
+
+  // サイドバー文字サイズ計算 (数値px: 10px〜20px、デフォルト12px)
+  const getSidebarFontSizePx = (): number => {
+    const raw = settings.sidebarFontSize;
+    if (typeof raw === 'number' && !isNaN(raw)) {
+      return Math.max(9, Math.min(20, raw));
+    }
+    if ((raw as any) === 'sm') return 11;
+    if ((raw as any) === 'lg') return 14;
+    return 12;
+  };
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -602,25 +648,6 @@ export default function App() {
       localStorage.setItem('sv_settings', JSON.stringify(newSettings));
     } catch(e) {}
   };
-
-  // Update browser theme-color meta tag dynamically based on the current theme
-  useEffect(() => {
-    const themeColors = {
-      navy: '#000000',
-      dark: '#000000',
-      light: '#f8fafc',
-      mocha: '#59483A',
-      latte: '#9E8668',
-    };
-    const color = themeColors[settings.theme] || '#000000';
-    let meta = document.querySelector('meta[name="theme-color"]');
-    if (!meta) {
-      meta = document.createElement('meta');
-      meta.setAttribute('name', 'theme-color');
-      document.head.appendChild(meta);
-    }
-    meta.setAttribute('content', color);
-  }, [settings.theme]);
 
   // Sync Tampermonkey
   useEffect(() => {
@@ -992,6 +1019,11 @@ export default function App() {
   return (
     <div className={`flex bg-slate-950 text-slate-300 font-sans h-screen overflow-hidden select-none ${settings.theme === 'light' ? 'theme-light' : settings.theme === 'dark' ? 'theme-dark' : settings.theme === 'mocha' ? 'theme-mocha' : settings.theme === 'latte' ? 'theme-latte' : ''}`}>
       
+      {/* リサイズ中のiframeマウスイベント横取り防止用透明オーバーレイ */}
+      {isResizingSidebar && (
+        <div className="fixed inset-0 z-[999] cursor-col-resize select-none touch-none" />
+      )}
+      
       {/* Search overlay & basic context layout */}
       <div 
         className="flex h-full w-full relative" 
@@ -1000,7 +1032,7 @@ export default function App() {
         
         {/* === Sidebar === */}
         <div 
-          className="flex flex-col border-slate-800 sidebar-container shrink-0 h-full z-40 transition-all duration-300"
+          className="flex flex-col border-slate-800 sidebar-container shrink-0 h-full z-40"
           style={{ 
             position: 'absolute',
             top: 0,
@@ -1540,7 +1572,7 @@ export default function App() {
                   </button>
                 )}
 
-                {/* 最右端：サイドバー位置切替トグルアイコン ＆ 全画面ボタン */}
+                {/* 最右端：サイドバー位置切替トグルアイコン ＆ 全画面ボタン ＆ 別タブで開くボタン */}
                 <div className="flex items-center gap-1 border-l border-white/20 pl-2 ml-1 shrink-0">
                   <button 
                     onClick={() => saveSettings({ ...settings, sidebarPosition: settings.sidebarPosition === 'left' ? 'right' : 'left' })}
@@ -1557,6 +1589,16 @@ export default function App() {
                   >
                     {isFullscreen ? <Minimize size={15} /> : <Maximize size={15} />}
                   </button>
+
+                  <a
+                    href={window.location.href}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="p-1.5 text-white/90 hover:bg-white/20 hover:text-cyan-400 rounded-md transition-colors border border-white/20 hover:border-white/40 inline-flex items-center justify-center shrink-0"
+                    title="別タブで開く (新しいウィンドウで開く)"
+                  >
+                    <ExternalLink size={15} />
+                  </a>
                 </div>
               </div>
             </div>
@@ -1565,7 +1607,7 @@ export default function App() {
           {/* === Tab Bar === */}
           {(tabs.length > 0 && !isImmersive) && (
             <div 
-              className="flex items-center bg-slate-900 border-b border-slate-800 shrink-0 z-20 relative transition-all duration-300 h-12"
+              className="flex items-center bg-slate-900 border-b border-slate-800 shrink-0 z-20 relative h-12"
               style={{ 
                 marginRight: (isSidebarOpen && settings.sidebarPosition === 'right') ? `${settings.sidebarWidth}px` : '0px',
                 marginLeft: (isSidebarOpen && settings.sidebarPosition === 'left') ? `${settings.sidebarWidth}px` : '0px',
@@ -1676,32 +1718,36 @@ export default function App() {
             </div>
           )}
 
-          {/* Sidebar Toggle Button (Expanding tab with wider hit area) */}
-          <button
-            onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-            className="absolute top-1/2 -translate-y-1/2 z-[60] flex items-center justify-center group cursor-pointer transition-all duration-300"
+          {/* Sidebar Boundary Resizer & Toggle Handle (ドラッグで幅変更 / クリックで開閉) */}
+          <div
+            onPointerDown={handleBoundaryPointerDown}
+            className={`absolute top-0 bottom-0 z-[60] flex items-center justify-center cursor-col-resize group select-none touch-none ${settings.sidebarPosition === 'left' ? '-translate-x-1/2' : 'translate-x-1/2'}`}
             style={{
-              width: '24px',
-              height: '100px',
+              width: '20px',
               left: settings.sidebarPosition === 'left' ? (isSidebarOpen ? `${settings.sidebarWidth}px` : '0px') : 'auto',
               right: settings.sidebarPosition === 'right' ? (isSidebarOpen ? `${settings.sidebarWidth}px` : '0px') : 'auto',
             }}
-            title="サイドバーを開閉"
+            title={isSidebarOpen ? "ドラッグでサイドバー幅を変更 / クリックで開閉" : "クリックでサイドバーを開く"}
           >
+            {/* ホバー時に現れる境界ハイライト縦ライン */}
+            <div className="absolute top-0 bottom-0 w-[2px] bg-transparent group-hover:bg-cyan-400/60 transition-colors pointer-events-none" />
+
+            {/* 中央のピル型グリップハンドル */}
             <div 
-              className={`absolute top-1/2 -translate-y-1/2 bg-slate-700/60 group-hover:bg-slate-600 transition-all duration-300 shadow-lg backdrop-blur-sm flex items-center justify-center h-[80px] text-white
-                ${settings.sidebarPosition === 'left' ? 'left-0 rounded-r-md' : 'right-0 rounded-l-md'}
-                w-[6px] group-hover:w-[20px]`}
+              className="flex items-center justify-center transition-all duration-200 shadow-md backdrop-blur-sm text-white rounded-full
+                h-[56px] w-[5px] group-hover:w-[22px]
+                bg-slate-300/80 group-hover:bg-slate-900 border border-slate-600/70 group-hover:border-cyan-400
+                opacity-80 group-hover:opacity-100 pointer-events-none"
             >
-              <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-300 overflow-hidden shrink-0 flex items-center justify-center w-full">
+              <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 overflow-hidden shrink-0 flex items-center justify-center w-full text-cyan-400">
                 {settings.sidebarPosition === 'left' ? (
-                  isSidebarOpen ? <ChevronLeft size={14} /> : <ChevronRight size={14} />
+                  isSidebarOpen ? <ChevronLeft size={13} /> : <ChevronRight size={13} />
                 ) : (
-                  isSidebarOpen ? <ChevronRight size={14} /> : <ChevronLeft size={14} />
+                  isSidebarOpen ? <ChevronRight size={13} /> : <ChevronLeft size={13} />
                 )}
               </div>
             </div>
-          </button>
+          </div>
 
           {/* Content Area */}
           <div className="flex-1 relative bg-slate-950 overflow-hidden">
@@ -1787,10 +1833,11 @@ export default function App() {
                   <input 
                     type="range" 
                     min="200" 
-                    max="600" 
+                    max="550" 
+                    step="1"
                     value={settings.sidebarWidth} 
                     onChange={(e) => saveSettings({ ...settings, sidebarWidth: Number(e.target.value) })}
-                    className="w-full accent-cyan-500 h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer"
+                    className="w-full solid-square-slider"
                   />
                 </div>
 
@@ -1808,7 +1855,7 @@ export default function App() {
                     max="100" 
                     value={Math.round((settings.sidebarOpacity ?? 1) * 100)} 
                     onChange={(e) => saveSettings({ ...settings, sidebarOpacity: Number(e.target.value) / 100 })}
-                    className="w-full accent-cyan-500 h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer"
+                    className="w-full solid-square-slider"
                   />
                 </div>
 
@@ -1816,19 +1863,42 @@ export default function App() {
                   <label className="text-[11px] font-bold text-slate-400 uppercase tracking-widest block mb-2">
                     {t('sidebarPos')}
                   </label>
-                  <div className="flex bg-slate-800 rounded-md p-1 border border-slate-700">
+                  <div className="flex bg-slate-800 rounded-none p-1 border border-slate-700">
                     <button 
-                      className={`flex-1 flex justify-center items-center py-1.5 text-xs font-bold rounded-sm transition-colors ${settings.sidebarPosition === 'left' ? 'bg-cyan-600 text-black' : 'text-slate-400 hover:text-slate-200'}`}
+                      className={`flex-1 flex justify-center items-center py-1.5 text-xs font-bold transition-colors ${settings.sidebarPosition === 'left' ? 'bg-cyan-600 text-black' : 'text-slate-400 hover:text-slate-200'}`}
                       onClick={() => saveSettings({ ...settings, sidebarPosition: 'left' })}
                     >
                       {t('posLeft')}
                     </button>
                     <button 
-                      className={`flex-1 flex justify-center items-center py-1.5 text-xs font-bold rounded-sm transition-colors ${settings.sidebarPosition === 'right' ? 'bg-cyan-600 text-black' : 'text-slate-400 hover:text-slate-200'}`}
+                      className={`flex-1 flex justify-center items-center py-1.5 text-xs font-bold transition-colors ${settings.sidebarPosition === 'right' ? 'bg-cyan-600 text-black' : 'text-slate-400 hover:text-slate-200'}`}
                       onClick={() => saveSettings({ ...settings, sidebarPosition: 'right' })}
                     >
                       {t('posRight')}
                     </button>
+                  </div>
+                </div>
+
+                <div>
+                  <div className="flex justify-between items-center mb-2">
+                    <label className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">
+                      {t('sidebarFontSize')}
+                    </label>
+                    <span className="text-xs font-mono font-bold text-cyan-400">{getSidebarFontSizePx()}PX</span>
+                  </div>
+                  <input 
+                    type="range" 
+                    min="10" 
+                    max="18" 
+                    step="1"
+                    value={getSidebarFontSizePx()} 
+                    onChange={(e) => saveSettings({ ...settings, sidebarFontSize: Number(e.target.value) })}
+                    className="w-full solid-square-slider"
+                  />
+                  <div className="flex justify-between text-[9px] text-slate-500 font-mono mt-1">
+                    <span>10px (小)</span>
+                    <span>12px (標準)</span>
+                    <span>18px (大)</span>
                   </div>
                 </div>
 
