@@ -171,6 +171,7 @@ interface LinkManagerViewProps {
   onReorderSubFolders?: (parentName: string, newOrder: string[]) => void;
   theme?: string;
   onSelectLocation: (loc: LocationItem) => void;
+  onOpenOrFocusTab?: (loc: LocationItem) => void;
   onOpenInNewTab?: (loc: LocationItem) => void;
   onOpenInNewWindow?: (loc: LocationItem) => void;
   onEditLocation: (loc: LocationItem) => void;
@@ -202,6 +203,7 @@ export const LinkManagerView: React.FC<LinkManagerViewProps> = ({
   listFontSize = 12,
   onUpdateListFontSize,
   onSelectLocation,
+  onOpenOrFocusTab,
   onOpenInNewTab,
   onOpenInNewWindow,
   onEditLocation,
@@ -1484,9 +1486,15 @@ export const LinkManagerView: React.FC<LinkManagerViewProps> = ({
                     >
                       <div className="flex items-center justify-end gap-1">
                         <button
-                          onClick={() => onSelectLocation(item)}
+                          onClick={() => {
+                            if (onOpenOrFocusTab) {
+                              onOpenOrFocusTab(item);
+                            } else {
+                              onSelectLocation(item);
+                            }
+                          }}
                           className="p-1.5 rounded transition-colors cursor-pointer text-slate-400 hover:text-cyan-400 hover:bg-slate-800 shrink-0"
-                          title="ストリートビューで表示"
+                          title={language === 'jp' ? "ストリートビューで表示 (既存タブまたは新規タブ)" : "Open in Street View (Existing or New Tab)"}
                         >
                           <Compass size={14} />
                         </button>

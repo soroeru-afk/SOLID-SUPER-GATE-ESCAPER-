@@ -356,24 +356,47 @@ export default function App() {
   const goToFirstTab = () => {
     if (tabs.length > 0) {
       selectTabByIndex(0);
+      if (tabsContainerRef.current) {
+        tabsContainerRef.current.scrollTo({ left: 0, behavior: 'smooth' });
+      }
     }
   };
 
   const goToLastTab = () => {
     if (tabs.length > 0) {
       selectTabByIndex(tabs.length - 1);
+      if (tabsContainerRef.current) {
+        tabsContainerRef.current.scrollTo({ left: tabsContainerRef.current.scrollWidth, behavior: 'smooth' });
+      }
     }
   };
 
   // アクティブタブが切り替わったときにタブバー内で表示領域にスクロール
   useEffect(() => {
-    if (activeTabId) {
+    if (activeTabId && tabsContainerRef.current) {
       const el = tabRefs.current.get(activeTabId);
-      if (el) {
-        el.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
+      const container = tabsContainerRef.current;
+      if (el && container) {
+        const idx = tabs.findIndex(t => t.id === activeTabId);
+        if (idx === 0) {
+          container.scrollTo({ left: 0, behavior: 'smooth' });
+        } else if (idx === tabs.length - 1) {
+          container.scrollTo({ left: container.scrollWidth, behavior: 'smooth' });
+        } else {
+          const elLeft = el.offsetLeft;
+          const elWidth = el.offsetWidth;
+          const containerScrollLeft = container.scrollLeft;
+          const containerWidth = container.clientWidth;
+
+          if (elLeft < containerScrollLeft + 30) {
+            container.scrollTo({ left: Math.max(0, elLeft - 50), behavior: 'smooth' });
+          } else if (elLeft + elWidth > containerScrollLeft + containerWidth - 30) {
+            container.scrollTo({ left: elLeft + elWidth - containerWidth + 50, behavior: 'smooth' });
+          }
+        }
       }
     }
-  }, [activeTabId]);
+  }, [activeTabId, tabs]);
 
   // タブ領域でのマウスホイール操作によるタブ切り替え
   // カオルさまのご指定通り: ホイール下回転 -> 左のタブへ / ホイール上回転 -> 右のタブへ
@@ -496,6 +519,30 @@ export default function App() {
 
     // 現在のアクティブタブの場所を、選択した場所に切り替える（他タブにあっても独立して開ける）
     setTabs(tabs.map(t => t.id === activeTabId ? { ...t, location: item } : t));
+  };
+
+  // ストリートビューで開くボタン用（すでにタブで開いている場合はそのタブに切り替え、開いていない場合は新規タブで開く）
+  const openOrFocusTab = (item: LocationItem) => {
+    setMainViewMode('viewer');
+
+    // 1. すでにいずれかのタブで同じ場所が開かれているかチェック
+    const existingTab = tabs.find(t => t.location?.id === item.id);
+    if (existingTab) {
+      setActiveTabId(existingTab.id);
+      return;
+    }
+
+    // 2. 現在のアクティブタブが空（locationがnull）の場合、現在のタブに割り当てる
+    const currentActiveTab = tabs.find(t => t.id === activeTabId);
+    if (currentActiveTab && !currentActiveTab.location) {
+      setTabs(tabs.map(t => t.id === activeTabId ? { ...t, location: item } : t));
+      return;
+    }
+
+    // 3. どのタブでも開かれていない場合は「新規タブを作成」してそこで開く
+    const newTabId = crypto.randomUUID();
+    setTabs(prev => [...prev, { id: newTabId, location: item }]);
+    setActiveTabId(newTabId);
   };
 
   const duplicateTab = (e: React.MouseEvent, tab: TabData) => {
@@ -1065,7 +1112,100 @@ export default function App() {
     return groups;
   }, [locations, searchQuery, sortOrder]);
 
-  const allFolders = useMemo(() => Array.from(new Set(locations.map(i => i.folderName))).sort(), [locations]);
+  // 全フォルダ（無検索・全量）の階層構造定義
+  const fullHierarchicalFolders = useMemo(() => {
+    const parents: Record<string, {
+      name: string;
+      subGroups: { subName: string; fullName: string; count: number }[];
+      hasDirect: boolean;
+    }> = {};
+
+    locations.forEach(item => {
+      const folderName = item.folderName || 'General';
+      const parts = folderName.split(' / ');
+      const parentName = parts[0].trim();
+
+      if (!parents[parentName]) {
+        parents[parentName] = {
+          name: parentName,
+          subGroups: [],
+          hasDirect: false
+        };
+      }
+
+      if (parts.length > 1) {
+        const subName = parts.slice(1).join(' / ').trim();
+        let sub = parents[parentName].subGroups.find(s => s.fullName === folderName);
+        if (!sub) {
+          sub = { subName, fullName: folderName, count: 0 };
+          parents[parentName].subGroups.push(sub);
+        }
+        sub.count++;
+      } else {
+        parents[parentName].hasDirect = true;
+      }
+    });
+
+    const sortedParents = Object.values(parents).sort((a, b) => {
+      const idxA = parentFolderOrder.indexOf(a.name);
+      const idxB = parentFolderOrder.indexOf(b.name);
+      if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+      if (idxA !== -1) return -1;
+      if (idxB !== -1) return 1;
+      return a.name.localeCompare(b.name);
+    });
+
+    return sortedParents.map(p => {
+      const customSubOrder = subFolderOrder[p.name];
+      if (customSubOrder && customSubOrder.length > 0) {
+        p.subGroups.sort((a, b) => {
+          const idxA = customSubOrder.indexOf(a.subName);
+          const idxB = customSubOrder.indexOf(b.subName);
+          if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+          if (idxA !== -1) return -1;
+          if (idxB !== -1) return 1;
+          return a.subName.localeCompare(b.subName);
+        });
+      } else {
+        p.subGroups.sort((a, b) => a.subName.localeCompare(b.subName));
+      }
+      return p;
+    });
+  }, [locations, parentFolderOrder, subFolderOrder]);
+
+  // サイドバーやリストマネージャーの並び順（親カテゴリ順・サブカテゴリ順）と完全に一致した全フォルダリスト
+  const allFolders = useMemo(() => {
+    const list: string[] = [];
+    const seen = new Set<string>();
+
+    fullHierarchicalFolders.forEach(parent => {
+      if (parent.hasDirect && !seen.has(parent.name)) {
+        list.push(parent.name);
+        seen.add(parent.name);
+      }
+      parent.subGroups.forEach(sub => {
+        if (!seen.has(sub.fullName)) {
+          list.push(sub.fullName);
+          seen.add(sub.fullName);
+        }
+      });
+      if (!seen.has(parent.name) && locations.some(l => l.folderName === parent.name)) {
+        list.push(parent.name);
+        seen.add(parent.name);
+      }
+    });
+
+    // 万が一漏れがある場合のフォールバック
+    locations.forEach(item => {
+      const f = item.folderName || 'General';
+      if (!seen.has(f)) {
+        list.push(f);
+        seen.add(f);
+      }
+    });
+
+    return list;
+  }, [fullHierarchicalFolders, locations]);
 
   // 階層化したフォルダ構造の定義
   const hierarchicalFolders = useMemo(() => {
@@ -2049,15 +2189,36 @@ export default function App() {
                                               )}
                                             </div>
                                           </div>
-                                          <div className="absolute right-2 opacity-0 group-hover/item:opacity-100 transition-opacity flex bg-slate-900 rounded-sm">
+                                          <div className="absolute right-2 opacity-0 group-hover/item:opacity-100 transition-opacity flex items-center bg-slate-900/95 border border-slate-700/80 rounded-sm shadow-md z-10">
                                             <button 
-                                              className="hover:text-cyan-400 p-1.5 transition-colors shrink-0 disabled:opacity-50"
+                                              className="hover:text-cyan-400 p-1.5 transition-colors shrink-0 cursor-pointer text-slate-400"
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                openOrFocusTab(item);
+                                              }}
+                                              title="ストリートビューで表示 (既存タブまたは新規タブ)"
+                                            >
+                                              <Compass size={12} />
+                                            </button>
+                                            <button 
+                                              className="hover:text-cyan-400 p-1.5 transition-colors shrink-0 cursor-pointer text-slate-400"
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                openInCenteredWindow(item, 1920, 1100);
+                                              }}
+                                              title="別窓で開く (新しいウィンドウ)"
+                                            >
+                                              <ExternalLink size={12} />
+                                            </button>
+                                            <button 
+                                              className="hover:text-white p-1.5 transition-colors shrink-0 disabled:opacity-50 cursor-pointer text-slate-400"
                                               onClick={(e) => {
                                                 e.stopPropagation();
                                                 setEditTarget(item);
                                                 setIsEditModalOpen(true);
                                               }}
                                               disabled={isSelectMode}
+                                              title="詳細設定を編集"
                                             >
                                               <Edit2 size={12} />
                                             </button>
@@ -2116,15 +2277,36 @@ export default function App() {
                                     )}
                                   </div>
                                 </div>
-                                <div className="absolute right-2 opacity-0 group-hover/item:opacity-100 transition-opacity flex bg-slate-900 rounded-sm">
+                                <div className="absolute right-2 opacity-0 group-hover/item:opacity-100 transition-opacity flex items-center bg-slate-900/95 border border-slate-700/80 rounded-sm shadow-md z-10">
                                   <button 
-                                    className="hover:text-cyan-400 p-1.5 transition-colors shrink-0 disabled:opacity-50"
+                                    className="hover:text-cyan-400 p-1.5 transition-colors shrink-0 cursor-pointer text-slate-400"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      openOrFocusTab(item);
+                                    }}
+                                    title="ストリートビューで表示 (既存タブまたは新規タブ)"
+                                  >
+                                    <Compass size={12} />
+                                  </button>
+                                  <button 
+                                    className="hover:text-cyan-400 p-1.5 transition-colors shrink-0 cursor-pointer text-slate-400"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      openInCenteredWindow(item, 1920, 1100);
+                                    }}
+                                    title="別窓で開く (新しいウィンドウ)"
+                                  >
+                                    <ExternalLink size={12} />
+                                  </button>
+                                  <button 
+                                    className="hover:text-white p-1.5 transition-colors shrink-0 disabled:opacity-50 cursor-pointer text-slate-400"
                                     onClick={(e) => {
                                       e.stopPropagation();
                                       setEditTarget(item);
                                       setIsEditModalOpen(true);
                                     }}
                                     disabled={isSelectMode}
+                                    title="詳細設定を編集"
                                   >
                                     <Edit2 size={12} />
                                   </button>
@@ -2450,7 +2632,7 @@ export default function App() {
 
               <div 
                 ref={tabsContainerRef}
-                className="flex-1 flex items-center gap-1 py-2 px-1 overflow-x-auto scrollbar-hide"
+                className="flex-1 flex items-center gap-1 py-1.5 px-1 overflow-x-auto tab-scrollbar select-none"
               >
                 {tabs.map((tab, idx) => (
                   <button
@@ -2499,10 +2681,13 @@ export default function App() {
                     </div>
                   </button>
                 ))}
-                
+              </div>
+
+              {/* 常時固定のタブ操作ボタン群（+新規タブ & 全て閉じる） */}
+              <div className="flex items-center shrink-0 border-l border-slate-800 px-1 bg-slate-900 z-10">
                 <button 
                   onClick={addNewTab}
-                  className="flex items-center justify-center w-7 h-7 border border-slate-500 border-dashed text-slate-400 hover:bg-slate-800 hover:border-slate-400 hover:text-slate-300 transition-colors mx-1 shrink-0 rounded-sm"
+                  className="flex items-center justify-center w-7 h-7 border border-slate-600 border-dashed text-slate-400 hover:text-cyan-400 hover:border-cyan-500 hover:bg-slate-800 transition-colors mx-1 shrink-0 rounded-sm cursor-pointer"
                   title={t('newTab')}
                 >
                   <Plus size={14} strokeWidth={2.5} />
@@ -2510,7 +2695,8 @@ export default function App() {
                 
                 <button 
                   onClick={() => { setTabs([]); setActiveTabId(null); }}
-                  className="flex items-center justify-center px-3 py-1.5 border border-slate-700 border-dashed text-slate-500 hover:bg-slate-800 hover:border-slate-600 hover:text-slate-300 transition-colors text-[10px] uppercase font-mono shrink-0 mr-1"
+                  className="flex items-center justify-center px-2.5 py-1.5 border border-slate-700 border-dashed text-slate-400 hover:text-red-400 hover:border-red-500/60 hover:bg-slate-800 transition-colors text-[10px] uppercase font-mono shrink-0 mr-1 cursor-pointer whitespace-nowrap"
+                  title="すべてのタブを閉じる"
                 >
                   {t('clearAllTabs')}
                 </button>
@@ -2608,6 +2794,9 @@ export default function App() {
                 theme={settings.theme}
                 onSelectLocation={(loc) => {
                   handleItemClick(loc);
+                }}
+                onOpenOrFocusTab={(loc) => {
+                  openOrFocusTab(loc);
                 }}
                 onOpenInNewWindow={(loc) => {
                   openInCenteredWindow(loc, 1920, 1100);

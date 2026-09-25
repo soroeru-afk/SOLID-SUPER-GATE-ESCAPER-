@@ -218,6 +218,25 @@
     -ms-overflow-style: none; /* IE and Edge */
     scrollbar-width: none; /* Firefox */
   }
+
+  .tab-scrollbar::-webkit-scrollbar {
+    height: 5px;
+  }
+  .tab-scrollbar::-webkit-scrollbar-track {
+    background: rgba(15, 23, 42, 0.6);
+    border-radius: 3px;
+  }
+  .tab-scrollbar::-webkit-scrollbar-thumb {
+    background: rgba(100, 116, 139, 0.7);
+    border-radius: 3px;
+  }
+  .tab-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: #06b6d4;
+  }
+  .tab-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(100, 116, 139, 0.7) rgba(15, 23, 42, 0.6);
+  }
 }
 
 .theme-mocha .bg-header-bg {
