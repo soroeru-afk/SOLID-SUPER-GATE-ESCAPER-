@@ -155,6 +155,39 @@ const translations = {
 };
 
 // === Utilities ===
+export const extractPanoId = (url: string): string | undefined => {
+  if (!url) return undefined;
+  // ストリートビュー形式（3a または !1e1, !1e2）を含まない場合、URL中の !1s はプレイスIDや検索クエリなのでパノラマIDではない
+  const isStreetViewUrl = url.includes(',3a,') || url.includes('/3a/') || url.includes('!1e1') || url.includes('!1e2') || url.includes('layer=c');
+  if (!isStreetViewUrl) return undefined;
+
+  // 1. !1e1... !1s[PANO] の標準ストリートビューパターン
+  const svPanoMatch = url.match(/!1e[12](?:![^!]+)*!1s([^!&?]+)/);
+  if (svPanoMatch) {
+    const candidate = svPanoMatch[1];
+    if (!candidate.startsWith('0x') && !candidate.startsWith('ChIJ')) {
+      return candidate;
+    }
+  }
+
+  // 2. AF1Qip または CAoS で始まるユーザー投稿パノラマ
+  const userPanoMatch = url.match(/!1s(AF1Qip[^!&?]+|CAoS[^!&?]+)/);
+  if (userPanoMatch) {
+    return userPanoMatch[1];
+  }
+
+  // 3. 一般的な!1sマッチ（ただし 0x, ChIJ, 特殊プレイスIDを除外）
+  const generalMatch = url.match(/!1s([^!&?]+)/);
+  if (generalMatch) {
+    const candidate = generalMatch[1];
+    if (!candidate.startsWith('0x') && !candidate.startsWith('ChIJ') && !candidate.startsWith('search') && candidate.length > 5) {
+      return candidate;
+    }
+  }
+
+  return undefined;
+};
+
 export const parseGoogleMapsUrl = (url: string) => {
   const latLngMatch = url.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/);
   if (!latLngMatch) return { isValid: false, fallbackUrl: url };
@@ -162,12 +195,7 @@ export const parseGoogleMapsUrl = (url: string) => {
   const lat = latLngMatch[1];
   const lng = latLngMatch[2];
 
-  let panoId: string | undefined = undefined;
-  // !1s で始まるパラメータのうち、0x...（プレイスID/CID）を除外したものが真のパノラマID
-  const panoMatch = url.match(/!1s([^!&?]+)/);
-  if (panoMatch && !panoMatch[1].startsWith('0x')) {
-    panoId = panoMatch[1];
-  }
+  const panoId = extractPanoId(url);
 
   let heading = '0';
   const hMatch = url.match(/,(-?\d+(?:\.\d+)?)h/);
@@ -180,7 +208,6 @@ export const parseGoogleMapsUrl = (url: string) => {
   }
 
   let zoom = '0';
-  // y(FOV)からzoomを計算すると、旧来のcbpパラメーターとの互換性で寄りすぎてしまうため常に0(ワイド)とする
   const yMatch = url.match(/,(-?\d+(?:\.\d+)?)y/);
   if (yMatch) {
     // const fov = parseFloat(yMatch[1]);
@@ -998,6 +1025,13 @@ export default function App() {
     }
   }, [tabs, activeTabId]);
 
+  useEffect(() => {
+    if (!isLoaded.current) return;
+    try {
+      localStorage.setItem('sv_locations_cache', JSON.stringify(locations));
+    } catch(e) {}
+  }, [locations]);
+
   // Dynamic theme-color meta tag sync (Solid series standard: synchronized to Sidebar Header background)
   useEffect(() => {
     const themeHeaderColors: Record<string, string> = {
@@ -1709,12 +1743,15 @@ export default function App() {
   };
 
   const getIframeUrl = (item: LocationItem) => {
-    if (item.parsed && item.parsed.isValid) {
-      const p = item.parsed;
+    let p = item.parsed;
+    if (!p || !p.isValid) {
+      p = parseGoogleMapsUrl(item.url);
+    }
+    if (p && p.isValid && p.lat && p.lng) {
       const zoom = p.zoom || '0';
-      const isRealPano = p.pano && !p.pano.startsWith('0x');
-      const panoParam = isRealPano ? `panoid=${p.pano}` : `cbll=${p.lat},${p.lng}`;
-      return `https://maps.google.com/maps?layer=c&${panoParam}&cbp=0,${p.heading || 0},0,${zoom},${p.pitch || 0}&output=svembed`;
+      // ユーザー投稿360写真(AF1Qip/CAoS)や期限切れパノラマIDによる「ストリートビューを表示できません」を完全防止
+      // cbll(緯度経度)を指定することで、Googleが自動的にその地点の最新・有効な公式ストリートビューを表示します
+      return `https://maps.google.com/maps?layer=c&cbll=${p.lat},${p.lng}&cbp=0,${p.heading || 0},0,${zoom},${p.pitch || 0}&output=svembed`;
     }
     return `https://maps.google.com/maps?q=${encodeURIComponent(item.url)}&output=embed`;
   };

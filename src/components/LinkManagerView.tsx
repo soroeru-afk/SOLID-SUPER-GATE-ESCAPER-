@@ -47,13 +47,28 @@ export const getDirectStreetViewUrl = (urlOrLoc: string | { url?: string; parsed
   const lng = parsedObj?.lng !== undefined && parsedObj?.lng !== null ? String(parsedObj.lng) : (latLngMatch ? latLngMatch[2] : null);
 
   if (lat && lng) {
-    // pano ID
+    // pano ID: ストリートビューURL（3aまたは!1e1,!1e2）であり、0xやChIJなどのプレイスIDではないもののみ
     let pano = parsedObj?.pano;
-    if (!pano) {
-      const panoMatch = rawUrl.match(/!1s([^!&?]+)/);
-      if (panoMatch && !panoMatch[1].startsWith('0x')) pano = panoMatch[1];
+    if (!pano && rawUrl) {
+      const isStreetViewUrl = rawUrl.includes(',3a,') || rawUrl.includes('/3a/') || rawUrl.includes('!1e1') || rawUrl.includes('!1e2') || rawUrl.includes('layer=c');
+      if (isStreetViewUrl) {
+        const svPanoMatch = rawUrl.match(/!1e[12](?:![^!]+)*!1s([^!&?]+)/);
+        if (svPanoMatch && !svPanoMatch[1].startsWith('0x') && !svPanoMatch[1].startsWith('ChIJ')) {
+          pano = svPanoMatch[1];
+        } else {
+          const userPanoMatch = rawUrl.match(/!1s(AF1Qip[^!&?]+|CAoS[^!&?]+)/);
+          if (userPanoMatch) {
+            pano = userPanoMatch[1];
+          } else {
+            const panoMatch = rawUrl.match(/!1s([^!&?]+)/);
+            if (panoMatch && !panoMatch[1].startsWith('0x') && !panoMatch[1].startsWith('ChIJ') && !panoMatch[1].startsWith('search') && panoMatch[1].length > 5) {
+              pano = panoMatch[1];
+            }
+          }
+        }
+      }
     }
-    if (pano && pano.startsWith('0x')) {
+    if (pano && (pano.startsWith('0x') || pano.startsWith('ChIJ'))) {
       pano = undefined;
     }
 
@@ -79,7 +94,10 @@ export const getDirectStreetViewUrl = (urlOrLoc: string | { url?: string; parsed
     const pitchStr = `${pitchT.toFixed(2)}t`;
     const fov = '75y';
 
-    if (pano) {
+    // AF1Qip等のユーザー投稿360写真は削除・期限切れになりやすいため、公式Googleパノラマ以外は座標ベースで安定起動
+    const isOfficialPano = pano && !pano.startsWith('AF1Qip') && !pano.startsWith('CAoS') && !pano.startsWith('0x') && !pano.startsWith('ChIJ');
+
+    if (isOfficialPano) {
       return `https://www.google.com/maps/@${lat},${lng},3a,${fov},${headingStr},${pitchStr}/data=!3m6!1e1!3m4!1s${pano}!2e0!7i16384!8i8192`;
     }
     return `https://www.google.com/maps/@${lat},${lng},3a,${fov},${headingStr},${pitchStr}/data=!3m4!1e1!3m2!1e1!2e0`;
