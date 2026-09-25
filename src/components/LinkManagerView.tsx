@@ -27,9 +27,78 @@ export interface LocationItem {
   };
 }
 
+// === Google Maps 直接ストリートビューURLの安全生成ユーティリティ ===
+export const getDirectStreetViewUrl = (urlOrLoc: string | { url?: string; parsed?: any }) => {
+  let rawUrl = '';
+  let parsedObj: any = null;
+
+  if (typeof urlOrLoc === 'string') {
+    rawUrl = urlOrLoc;
+  } else if (urlOrLoc && typeof urlOrLoc === 'object') {
+    rawUrl = urlOrLoc.url || '';
+    parsedObj = urlOrLoc.parsed;
+  }
+
+  if (!rawUrl && !parsedObj) return '';
+
+  // 1. すでに parsed がある場合、または rawUrl から座標を抽出
+  const latLngMatch = rawUrl.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/);
+  const lat = parsedObj?.lat !== undefined && parsedObj?.lat !== null ? String(parsedObj.lat) : (latLngMatch ? latLngMatch[1] : null);
+  const lng = parsedObj?.lng !== undefined && parsedObj?.lng !== null ? String(parsedObj.lng) : (latLngMatch ? latLngMatch[2] : null);
+
+  if (lat && lng) {
+    // pano ID
+    let pano = parsedObj?.pano;
+    if (!pano) {
+      const panoMatch = rawUrl.match(/!1s([^!&?]+)/);
+      if (panoMatch) pano = panoMatch[1];
+    }
+
+    // heading (h)
+    let headingVal = 0;
+    if (parsedObj?.heading !== undefined && parsedObj?.heading !== null) {
+      headingVal = parseFloat(String(parsedObj.heading)) || 0;
+    } else {
+      const hMatch = rawUrl.match(/,(-?\d+(?:\.\d+)?)h/);
+      if (hMatch) headingVal = parseFloat(hMatch[1]) || 0;
+    }
+    const headingStr = `${Math.round(headingVal)}h`;
+
+    // pitch (t) : Google Maps の URL では 90t が正面（水平）、84t や 95t など
+    let pitchT = 90;
+    const tMatch = rawUrl.match(/,(-?\d+(?:\.\d+)?)t/);
+    if (tMatch) {
+      pitchT = parseFloat(tMatch[1]);
+    } else if (parsedObj?.pitch !== undefined && parsedObj?.pitch !== null) {
+      const pVal = parseFloat(String(parsedObj.pitch));
+      pitchT = 90 - (isNaN(pVal) ? 0 : pVal);
+    }
+    const pitchStr = `${pitchT.toFixed(2)}t`;
+    const fov = '75y';
+
+    if (pano) {
+      return `https://www.google.com/maps/@${lat},${lng},3a,${fov},${headingStr},${pitchStr}/data=!3m6!1e1!3m4!1s${pano}!2e0!7i16384!8i8192`;
+    }
+    return `https://www.google.com/maps/@${lat},${lng},3a,${fov},${headingStr},${pitchStr}/data=!3m4!1e1!3m2!1e1!2e0`;
+  }
+
+  // 2. 座標パースができない場合でも、自アプリのドメインや重複を削ぎ落として Google Maps の URL を修復
+  let cleaned = rawUrl.trim();
+  const googleIdx = cleaned.search(/google\.(?:com|co\.jp)\/maps/i);
+  if (googleIdx !== -1) {
+    cleaned = 'https://www.' + cleaned.slice(googleIdx);
+  } else if (!cleaned.startsWith('http://') && !cleaned.startsWith('https://')) {
+    cleaned = 'https://' + cleaned;
+  }
+
+  return cleaned;
+};
+
 // === 新しいウィンドウをモニター中央 (1920×1100) で開くユーティリティ ===
-export const openInCenteredWindow = (url: string, width = 1920, height = 1100) => {
-  if (!url) return;
+export const openInCenteredWindow = (urlOrLoc: string | LocationItem, width = 1920, height = 1100) => {
+  if (!urlOrLoc) return;
+  const targetUrl = getDirectStreetViewUrl(urlOrLoc);
+  if (!targetUrl) return;
 
   // 1. モニターの利用可能領域を取得 (iframe内のinnerHeightではなく、モニター自体の解像度を使用)
   const screenObj = typeof window !== 'undefined' ? (window.screen as any) : null;
@@ -77,7 +146,7 @@ export const openInCenteredWindow = (url: string, width = 1920, height = 1100) =
     'location=yes'
   ].join(',');
 
-  const win = window.open(url, '_blank', features);
+  const win = window.open(targetUrl, '_blank', features);
   if (win) {
     try {
       // featuresの座標に加えてmoveTo/resizeToも実行して確実に中央配置
@@ -94,6 +163,8 @@ interface LinkManagerViewProps {
   locations: LocationItem[];
   allFolders: string[];
   initialFolder?: string | null;
+  navigationToken?: number;
+  onFolderSelect?: (folder: string | null) => void;
   parentFolderOrder?: string[];
   onReorderParentFolders?: (newOrder: string[]) => void;
   subFolderOrder?: Record<string, string[]>;
@@ -122,6 +193,8 @@ export const LinkManagerView: React.FC<LinkManagerViewProps> = ({
   locations,
   allFolders,
   initialFolder = null,
+  navigationToken,
+  onFolderSelect,
   parentFolderOrder = [],
   onReorderParentFolders,
   subFolderOrder = {},
@@ -208,10 +281,10 @@ export const LinkManagerView: React.FC<LinkManagerViewProps> = ({
     setDragOverCardSub(null);
   };
 
-  // initialFolder の外部変更検知
+  // initialFolder / navigationToken の外部変更検知 (サイドバー連動)
   useEffect(() => {
-    if (initialFolder === undefined) return;
-    if (initialFolder === null) {
+    if (initialFolder === undefined && navigationToken === undefined) return;
+    if (!initialFolder) {
       setSelectedParent(null);
       setSelectedSub(null);
     } else {
@@ -219,13 +292,33 @@ export const LinkManagerView: React.FC<LinkManagerViewProps> = ({
       setSelectedParent(parts[0].trim());
       setSelectedSub(parts.length > 1 ? initialFolder : null);
     }
-  }, [initialFolder]);
+  }, [initialFolder, navigationToken]);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [draggedId, setDraggedId] = useState<string | null>(null);
   const [dragOverId, setDragOverId] = useState<string | null>(null);
   const [bulkTargetFolder, setBulkTargetFolder] = useState('');
+
+  // === オリジナルカスタム確認ダイアログ・プロンプト状態 ===
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    confirmText?: string;
+    cancelText?: string;
+    isDanger?: boolean;
+    onConfirm: () => void;
+  } | null>(null);
+
+  const [promptModal, setPromptModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    defaultValue: string;
+    onConfirm: (val: string) => void;
+  } | null>(null);
+  const [promptInputVal, setPromptInputVal] = useState('');
 
   // === 列幅のリサイズ状態管理 ===
   const [colWidths, setColWidths] = useState<{ title: number; coords: number; dir: number }>({
@@ -383,6 +476,32 @@ export const LinkManagerView: React.FC<LinkManagerViewProps> = ({
     }
     return list;
   }, [locations, selectedParent, selectedSub, searchQuery]);
+
+  // === 無限スクロール・遅延読み込み (800件以上のALL DATAでも爆速表示) ===
+  const [visibleCount, setVisibleCount] = useState(60);
+
+  // フォルダ選択や検索キーワードが変わったら表示件数をリセット
+  useEffect(() => {
+    setVisibleCount(60);
+  }, [selectedParent, selectedSub, searchQuery]);
+
+  // 画面に実際に描画するアイテム（必要に応じてスクロールで動的追加）
+  const displayedItems = useMemo(() => {
+    return filteredItems.slice(0, visibleCount);
+  }, [filteredItems, visibleCount]);
+
+  // テーブルスクロール検知（下部に近づいたら次の50件を瞬時に追加）
+  const handleTableScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const { scrollTop, scrollHeight, clientHeight } = e.currentTarget;
+    if (scrollTop + clientHeight >= scrollHeight - 350) {
+      setVisibleCount(prev => {
+        if (prev < filteredItems.length) {
+          return Math.min(prev + 50, filteredItems.length);
+        }
+        return prev;
+      });
+    }
+  };
 
   // 全選択 / 解除
   const toggleSelectAll = () => {
@@ -560,10 +679,20 @@ export const LinkManagerView: React.FC<LinkManagerViewProps> = ({
   // 一括削除
   const handleBulkDelete = () => {
     if (selectedIds.size === 0) return;
-    if (window.confirm(language === 'jp' ? `選択した ${selectedIds.size} 件の場所を削除してもよろしいですか？` : `Delete ${selectedIds.size} selected locations?`)) {
-      onBulkDelete(Array.from(selectedIds));
-      setSelectedIds(new Set());
-    }
+    setConfirmModal({
+      isOpen: true,
+      title: language === 'jp' ? '一括削除の確認' : 'Confirm Bulk Deletion',
+      message: language === 'jp' 
+        ? `選択した ${selectedIds.size} 件の場所を削除してもよろしいですか？\nこの操作は取り消せません。`
+        : `Are you sure you want to delete ${selectedIds.size} selected locations?`,
+      confirmText: language === 'jp' ? '削除する' : 'Delete',
+      isDanger: true,
+      onConfirm: () => {
+        onBulkDelete(Array.from(selectedIds));
+        setSelectedIds(new Set());
+        setConfirmModal(null);
+      }
+    });
   };
 
   // 一括タブ化
@@ -577,18 +706,24 @@ export const LinkManagerView: React.FC<LinkManagerViewProps> = ({
   const handleRenameCurrentFolder = () => {
     const targetFolder = selectedSub || selectedParent;
     if (!targetFolder) return;
-    const newName = window.prompt(
-      language === 'jp' ? `「${targetFolder}」の新しいフォルダ名を入力してください` : `Enter new name for "${targetFolder}"`,
-      targetFolder
-    );
-    if (newName && newName.trim() && newName.trim() !== targetFolder) {
-      onRenameFolder(targetFolder, newName.trim());
-      if (selectedSub) {
-        setSelectedSub(newName.trim());
-      } else {
-        setSelectedParent(newName.trim());
+    setPromptInputVal(targetFolder);
+    setPromptModal({
+      isOpen: true,
+      title: language === 'jp' ? 'フォルダ名の変更' : 'Rename Folder',
+      message: language === 'jp' ? `「${targetFolder}」の新しいフォルダ名を入力してください` : `Enter new name for "${targetFolder}"`,
+      defaultValue: targetFolder,
+      onConfirm: (newName) => {
+        if (newName && newName.trim() && newName.trim() !== targetFolder) {
+          onRenameFolder(targetFolder, newName.trim());
+          if (selectedSub) {
+            setSelectedSub(newName.trim());
+          } else {
+            setSelectedParent(newName.trim());
+          }
+        }
+        setPromptModal(null);
       }
-    }
+    });
   };
 
   // フォルダ削除
@@ -596,18 +731,24 @@ export const LinkManagerView: React.FC<LinkManagerViewProps> = ({
     const targetFolder = selectedSub || selectedParent;
     if (!targetFolder) return;
     const count = selectedSub ? (folderCounts[selectedSub] || 0) : (currentParentInfo?.totalCount || 0);
-    if (window.confirm(
-      language === 'jp' 
-        ? `フォルダ「${targetFolder}」および含まれるすべての場所 (${count} 件) を削除しますか？`
-        : `Delete folder "${targetFolder}" and all its ${count} locations?`
-    )) {
-      onDeleteFolder(targetFolder);
-      if (selectedSub) {
-        setSelectedSub(null);
-      } else {
-        setSelectedParent(null);
+    setConfirmModal({
+      isOpen: true,
+      title: language === 'jp' ? 'フォルダ削除の確認' : 'Confirm Folder Deletion',
+      message: language === 'jp' 
+        ? `フォルダ「${targetFolder}」および含まれるすべての場所 (${count} 件) を削除しますか？\nこのフォルダ内の登録データもすべて削除されます。`
+        : `Delete folder "${targetFolder}" and all its ${count} locations?`,
+      confirmText: language === 'jp' ? 'フォルダごと削除' : 'Delete Folder',
+      isDanger: true,
+      onConfirm: () => {
+        onDeleteFolder(targetFolder);
+        if (selectedSub) {
+          setSelectedSub(null);
+        } else {
+          setSelectedParent(null);
+        }
+        setConfirmModal(null);
       }
-    }
+    });
   };
 
   const isAllSelected = filteredItems.length > 0 && selectedIds.size === filteredItems.length;
@@ -641,6 +782,7 @@ export const LinkManagerView: React.FC<LinkManagerViewProps> = ({
               onClick={() => {
                 setSelectedParent(null);
                 setSelectedSub(null);
+                onFolderSelect?.(null);
               }}
               className={`hover:underline font-black transition-colors shrink-0 cursor-pointer ${
                 selectedParent === null ? 'text-cyan-600 dark:text-cyan-400 underline' : 'text-slate-300'
@@ -654,7 +796,10 @@ export const LinkManagerView: React.FC<LinkManagerViewProps> = ({
               <>
                 <ChevronRight size={14} className="text-slate-600 shrink-0" />
                 <button
-                  onClick={() => setSelectedSub(null)}
+                  onClick={() => {
+                    setSelectedSub(null);
+                    onFolderSelect?.(selectedParent);
+                  }}
                   className={`font-bold px-2 py-0.5 rounded truncate max-w-[220px] border transition-colors cursor-pointer ${
                     selectedSub === null
                       ? 'border-cyan-500/40 bg-cyan-500/20 text-white font-black'
@@ -750,6 +895,7 @@ export const LinkManagerView: React.FC<LinkManagerViewProps> = ({
               onClick={() => {
                 setSelectedParent(null);
                 setSelectedSub(null);
+                onFolderSelect?.(null);
               }}
               className="text-[10px] font-mono underline font-black text-cyan-600 dark:text-cyan-400 hover:opacity-80 cursor-pointer flex items-center gap-1"
             >
@@ -768,6 +914,7 @@ export const LinkManagerView: React.FC<LinkManagerViewProps> = ({
                 onClick={() => {
                   setSelectedParent(null);
                   setSelectedSub(null);
+                  onFolderSelect?.(null);
                 }}
                 className="flex items-center justify-between px-3 py-2 rounded border text-xs font-mono transition-all cursor-pointer shadow-xs bg-cyan-500 border-cyan-400 text-slate-950 font-black ring-2 ring-cyan-500/30"
               >
@@ -814,6 +961,7 @@ export const LinkManagerView: React.FC<LinkManagerViewProps> = ({
                     onClick={() => {
                       setSelectedParent(parent.name);
                       setSelectedSub(null);
+                      onFolderSelect?.(parent.name);
                     }}
                     className={`flex items-center justify-between px-3 py-2 rounded border text-xs font-mono transition-all cursor-pointer shadow-xs bg-slate-900 border-slate-800 hover:border-cyan-500/50 hover:bg-slate-800/90 text-slate-300 hover:text-white ${
                       isDragOver ? 'ring-2 ring-cyan-400 border-cyan-400' : ''
@@ -837,7 +985,10 @@ export const LinkManagerView: React.FC<LinkManagerViewProps> = ({
             <>
               {/* [ 親フォルダ すべて ] カード */}
               <button
-                onClick={() => setSelectedSub(null)}
+                onClick={() => {
+                  setSelectedSub(null);
+                  onFolderSelect?.(selectedParent);
+                }}
                 className={`flex items-center justify-between px-3 py-2 rounded border text-xs font-mono transition-all cursor-pointer shadow-xs ${
                   selectedSub === null
                     ? 'bg-cyan-500 border-cyan-400 text-slate-950 font-black ring-2 ring-cyan-500/30'
@@ -889,7 +1040,11 @@ export const LinkManagerView: React.FC<LinkManagerViewProps> = ({
                       setDraggedCardSub(null);
                       setDragOverCardSub(null);
                     }}
-                    onClick={() => setSelectedSub(isSelected ? null : sub.fullName)}
+                    onClick={() => {
+                      const next = isSelected ? null : sub.fullName;
+                      setSelectedSub(next);
+                      onFolderSelect?.(next || selectedParent);
+                    }}
                     className={`flex items-center justify-between px-3 py-2 rounded border text-xs font-mono transition-all cursor-pointer shadow-xs ${
                       isDragOver ? 'ring-2 ring-cyan-400 border-cyan-400' : ''
                     } ${isDragging ? 'opacity-40' : ''} ${
@@ -1075,7 +1230,10 @@ export const LinkManagerView: React.FC<LinkManagerViewProps> = ({
       </div>
 
       {/* === 4. LIST TABLE (境界線グリップハンドル付きリサイズ可能テーブル) === */}
-      <div className="flex-1 overflow-y-auto overflow-x-auto min-h-0">
+      <div 
+        onScroll={handleTableScroll}
+        className="flex-1 overflow-y-auto overflow-x-auto min-h-0"
+      >
         <table className="w-full text-left border-collapse font-sans text-xs table-fixed">
           {/* 列幅のcolgroup指定 */}
           <colgroup>
@@ -1148,7 +1306,8 @@ export const LinkManagerView: React.FC<LinkManagerViewProps> = ({
                 </td>
               </tr>
             ) : (
-              filteredItems.map((item, index) => {
+              <>
+                {displayedItems.map((item, index) => {
                 const isSelected = selectedIds.has(item.id);
                 const isDragging = draggedId === item.id;
                 const isOver = dragOverId === item.id;
@@ -1308,6 +1467,7 @@ export const LinkManagerView: React.FC<LinkManagerViewProps> = ({
                           const parts = folder.split(' / ');
                           setSelectedParent(parts[0].trim());
                           setSelectedSub(parts.length > 1 ? folder : null);
+                          onFolderSelect?.(folder);
                         }}
                         className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[11px] max-w-full truncate transition-colors cursor-pointer border border-slate-700 bg-slate-900 text-slate-300 hover:border-cyan-500 hover:text-cyan-400"
                         title="このフォルダで絞り込む"
@@ -1354,9 +1514,17 @@ export const LinkManagerView: React.FC<LinkManagerViewProps> = ({
                         </button>
                         <button
                           onClick={() => {
-                            if (window.confirm(language === 'jp' ? `「${item.title}」を削除しますか？` : `Delete "${item.title}"?`)) {
-                              onDeleteLocation(item.id);
-                            }
+                            setConfirmModal({
+                              isOpen: true,
+                              title: language === 'jp' ? '場所の削除' : 'Delete Location',
+                              message: language === 'jp' ? `「${item.title}」を削除しますか？` : `Delete "${item.title}"?`,
+                              confirmText: language === 'jp' ? '削除' : 'Delete',
+                              isDanger: true,
+                              onConfirm: () => {
+                                onDeleteLocation(item.id);
+                                setConfirmModal(null);
+                              }
+                            });
                           }}
                           className="p-1.5 rounded transition-colors cursor-pointer text-slate-400 hover:text-red-400 hover:bg-red-950/40 shrink-0"
                           title="削除"
@@ -1367,7 +1535,26 @@ export const LinkManagerView: React.FC<LinkManagerViewProps> = ({
                     </td>
                   </tr>
                 );
-              })
+              })}
+              {visibleCount < filteredItems.length && (
+                <tr>
+                  <td colSpan={6} className="py-3 text-center text-slate-400 bg-slate-900/60 border-t border-slate-800/80">
+                    <div className="flex items-center justify-center gap-3">
+                      <span className="text-xs font-mono text-slate-400">
+                        {filteredItems.length} 件中 {displayedItems.length} 件を表示中（スクロールで自動展開）
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setVisibleCount(filteredItems.length)}
+                        className="text-xs text-cyan-400 hover:text-cyan-300 font-bold underline px-2 py-0.5 rounded hover:bg-cyan-500/10 cursor-pointer transition-colors"
+                      >
+                        全件を一括表示
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              )}
+            </>
             )}
           </tbody>
         </table>
@@ -1390,6 +1577,95 @@ export const LinkManagerView: React.FC<LinkManagerViewProps> = ({
           💡 列境界線をドラッグで幅変更 / 行ドラッグで並べ替え / [ ⤊ ][ ↑ ][ ↓ ][ ⤋ ]で一括移動
         </div>
       </div>
+
+      {/* === 6. オリジナルカスタム確認ダイアログ (MODAL) === */}
+      {confirmModal && confirmModal.isOpen && (
+        <div 
+          className="fixed inset-0 z-[200] bg-black/70 backdrop-blur-xs flex items-center justify-center p-4"
+          onClick={() => setConfirmModal(null)}
+        >
+          <div 
+            className="bg-slate-900 border border-slate-700/80 rounded-xl w-full max-w-sm overflow-hidden shadow-2xl flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="px-5 py-4 border-b border-slate-800 bg-slate-900 flex items-center gap-2">
+              {confirmModal.isDanger ? (
+                <Trash2 size={16} className="text-red-400 shrink-0" />
+              ) : (
+                <Folder size={16} className="text-cyan-400 shrink-0" />
+              )}
+              <h2 className="text-sm font-bold text-white tracking-wide">{confirmModal.title}</h2>
+            </div>
+            <div className="p-5 text-slate-200 text-xs whitespace-pre-line leading-relaxed">
+              {confirmModal.message}
+            </div>
+            <div className="p-4 bg-slate-950 border-t border-slate-800 flex justify-end gap-2 shrink-0">
+              <button
+                onClick={() => setConfirmModal(null)}
+                className="px-4 py-2 border border-slate-700 text-slate-300 hover:bg-slate-800 rounded-md text-xs font-bold transition-colors cursor-pointer"
+              >
+                {confirmModal.cancelText || (language === 'jp' ? 'キャンセル' : 'Cancel')}
+              </button>
+              <button
+                onClick={() => confirmModal.onConfirm()}
+                className={`px-4 py-2 rounded-md text-xs font-bold transition-colors cursor-pointer ${
+                  confirmModal.isDanger 
+                    ? 'bg-red-600 hover:bg-red-500 text-white shadow-lg shadow-red-600/30' 
+                    : 'bg-cyan-600 hover:bg-cyan-500 text-black shadow-lg shadow-cyan-500/30'
+                }`}
+              >
+                {confirmModal.confirmText || (language === 'jp' ? 'OK' : 'OK')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* === 7. オリジナルカスタムプロンプト (MODAL) === */}
+      {promptModal && promptModal.isOpen && (
+        <div 
+          className="fixed inset-0 z-[200] bg-black/70 backdrop-blur-xs flex items-center justify-center p-4"
+          onClick={() => setPromptModal(null)}
+        >
+          <div 
+            className="bg-slate-900 border border-slate-700/80 rounded-xl w-full max-w-sm overflow-hidden shadow-2xl flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="px-5 py-4 border-b border-slate-800 bg-slate-900 flex items-center gap-2">
+              <Edit2 size={16} className="text-cyan-400 shrink-0" />
+              <h2 className="text-sm font-bold text-white tracking-wide">{promptModal.title}</h2>
+            </div>
+            <div className="p-5 text-slate-200 text-xs flex flex-col gap-3">
+              <p className="whitespace-pre-line leading-relaxed">{promptModal.message}</p>
+              <input
+                type="text"
+                value={promptInputVal}
+                onChange={(e) => setPromptInputVal(e.target.value)}
+                autoFocus
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') promptModal.onConfirm(promptInputVal);
+                  if (e.key === 'Escape') setPromptModal(null);
+                }}
+                className="w-full bg-slate-800 border border-cyan-500/80 rounded-md px-3 py-2 text-sm text-white focus:outline-none focus:ring-1 focus:ring-cyan-400"
+              />
+            </div>
+            <div className="p-4 bg-slate-950 border-t border-slate-800 flex justify-end gap-2 shrink-0">
+              <button
+                onClick={() => setPromptModal(null)}
+                className="px-4 py-2 border border-slate-700 text-slate-300 hover:bg-slate-800 rounded-md text-xs font-bold transition-colors cursor-pointer"
+              >
+                {language === 'jp' ? 'キャンセル' : 'Cancel'}
+              </button>
+              <button
+                onClick={() => promptModal.onConfirm(promptInputVal)}
+                className="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-black rounded-md text-xs font-bold transition-colors cursor-pointer shadow-lg shadow-cyan-500/30"
+              >
+                {language === 'jp' ? '変更する' : 'Save'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );

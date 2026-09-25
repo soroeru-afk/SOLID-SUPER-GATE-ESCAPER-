@@ -12,6 +12,11 @@
   --scrollbar-thumb-hover: rgba(255, 255, 255, 0.2);
 }
 
+.theme-navy {
+  --color-header-bg: #000000;
+  --color-overlay-bg: #000000;
+}
+
 /* Light Theme Overrides (Solid Series Standard Slate-Gray & Clean Ice Palette) */
 .theme-light {
   --color-slate-950: #f8fafc; /* メイン背景：清潔感のある白に近いオフホワイト */

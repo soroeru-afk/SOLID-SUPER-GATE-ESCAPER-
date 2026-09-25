@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Settings, Folder, FolderOpen, Folders, File as FileIcon, X, Search, Plus, Minus, RotateCw, Trash2, Edit2, Upload, Download, Map as MapIcon, ChevronRight, ChevronLeft, ChevronsRight, ChevronsLeft, ChevronUp, ChevronDown, Menu, Check, Copy, PanelLeftClose, PanelRightClose, PanelLeftOpen, PanelRightOpen, PanelLeft, PanelRight, Maximize, Minimize, Palette, Eye, EyeOff, ExternalLink, LayoutList, GripVertical, ArrowUp, ArrowDown, Layers, Compass } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { LinkManagerView, openInCenteredWindow } from './components/LinkManagerView';
+import { LinkManagerView, openInCenteredWindow, getDirectStreetViewUrl } from './components/LinkManagerView';
 
 // === Types ===
 interface LocationItem {
@@ -188,10 +188,18 @@ export const parseGoogleMapsUrl = (url: string) => {
   return { lat, lng, pano: panoId, heading, pitch, zoom, isValid: true };
 };
 
-function processBookmarksHtml(htmlString: string): Omit<LocationItem, 'id' | 'parsed'>[] {
+interface ExtractedBookmarksResult {
+  items: Omit<LocationItem, 'id' | 'parsed'>[];
+  parentFolderOrder: string[];
+  subFolderOrder: Record<string, string[]>;
+}
+
+function processBookmarksHtml(htmlString: string): ExtractedBookmarksResult {
   const parser = new DOMParser();
   const doc = parser.parseFromString(htmlString, 'text/html');
   const items: Omit<LocationItem, 'id' | 'parsed'>[] = [];
+  const parentFolderOrder: string[] = [];
+  const subFolderOrder: Record<string, string[]> = {};
   
   const links = doc.querySelectorAll('a, A');
   links.forEach(a => {
@@ -225,9 +233,26 @@ function processBookmarksHtml(htmlString: string): Omit<LocationItem, 'id' | 'pa
         title: a.textContent || '名称未設定',
         url: url,
       });
+
+      // フォルダ順序の抽出
+      if (folderPath.length > 0) {
+        const parentName = folderPath[0].trim();
+        if (!parentFolderOrder.includes(parentName)) {
+          parentFolderOrder.push(parentName);
+        }
+        if (folderPath.length > 1) {
+          const subName = folderPath[1].trim();
+          if (!subFolderOrder[parentName]) {
+            subFolderOrder[parentName] = [];
+          }
+          if (!subFolderOrder[parentName].includes(subName)) {
+            subFolderOrder[parentName].push(subName);
+          }
+        }
+      }
     }
   });
-  return items;
+  return { items, parentFolderOrder, subFolderOrder };
 }
 
 const DEFAULT_SETTINGS: AppSettings = {
@@ -243,7 +268,16 @@ const DEFAULT_SETTINGS: AppSettings = {
 
 // === Main App Component ===
 export default function App() {
-  const [locations, setLocations] = useState<LocationItem[]>([]);
+  const [locations, setLocations] = useState<LocationItem[]>(() => {
+    try {
+      const cache = localStorage.getItem('sv_locations_cache');
+      if (cache) {
+        const parsed = JSON.parse(cache);
+        if (Array.isArray(parsed)) return parsed;
+      }
+    } catch {}
+    return [];
+  });
   const [folderState, setFolderState] = useState<Record<string, boolean>>({});
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -501,10 +535,28 @@ export default function App() {
   const [isResizingSidebar, setIsResizingSidebar] = useState(false);
 
   // メイン画面の表示モード ('viewer': ストリートビュー, 'manager': リンクマネージャー/リスト編集)
-  const [mainViewMode, setMainViewMode] = useState<'viewer' | 'manager'>('viewer');
+  // データが存在する場合は初期状態でリスト管理モード (ALL DATA) を表示
+  const [mainViewMode, setMainViewMode] = useState<'viewer' | 'manager'>(() => {
+    try {
+      const cache = localStorage.getItem('sv_locations_cache');
+      if (cache) {
+        const parsed = JSON.parse(cache);
+        if (Array.isArray(parsed) && parsed.length > 0) return 'manager';
+      }
+    } catch {}
+    return 'viewer';
+  });
   const [managerFolder, setManagerFolder] = useState<string | null>(null);
+  const [managerNavToken, setManagerNavToken] = useState<number>(() => Date.now());
   const [managerSearch, setManagerSearch] = useState('');
   const [draggedManagerId, setDraggedManagerId] = useState<string | null>(null);
+
+  // リスト管理画面のフォルダナビゲーション（サイドバー連動）
+  const navigateToManagerFolder = (folderName: string | null) => {
+    setMainViewMode('manager');
+    setManagerFolder(folderName);
+    setManagerNavToken(Date.now());
+  };
 
   // サイドバー親カテゴリーの並び替え状態 (localStorageで永続化)
   const [parentFolderOrder, setParentFolderOrder] = useState<string[]>(() => {
@@ -826,11 +878,21 @@ export default function App() {
   // Initialize
   useEffect(() => {
     try {
+      const urlParams = new URLSearchParams(window.location.search);
+      const targetId = urlParams.get('id') || urlParams.get('loc');
+      const targetUrlParam = urlParams.get('url');
+      const modeParam = urlParams.get('mode') || urlParams.get('view');
+
+      let parsedLocations: LocationItem[] = [];
       const cache = localStorage.getItem('sv_locations_cache');
       if (cache) {
         const parsed = JSON.parse(cache);
-        if (Array.isArray(parsed)) setLocations(parsed);
+        if (Array.isArray(parsed)) {
+          parsedLocations = parsed;
+          setLocations(parsed);
+        }
       }
+
       const savedSettings = localStorage.getItem('sv_settings');
       if (savedSettings) {
         const parsed = JSON.parse(savedSettings);
@@ -840,6 +902,7 @@ export default function App() {
         }
         setSettings({ ...DEFAULT_SETTINGS, ...parsed });
       }
+
       const savedTabs = localStorage.getItem('sv_tabs');
       const savedActiveTab = localStorage.getItem('sv_active_tab_id');
       
@@ -859,7 +922,31 @@ export default function App() {
       } else if (savedActiveTab) {
         setActiveTabId(savedActiveTab);
       }
-    } catch(e) {} finally {
+
+      // URLパラメータで特定の場所が指定されている場合は直接ビューアで表示
+      if (targetId || targetUrlParam || modeParam === 'viewer') {
+        setMainViewMode('viewer');
+        if (targetId) {
+          const match = parsedLocations.find(l => l.id === targetId);
+          if (match) {
+            handleItemClick(match);
+          }
+        } else if (targetUrlParam) {
+          const parsedGmaps = parseGoogleMapsUrl(targetUrlParam);
+          const tempItem: LocationItem = {
+            id: `direct_${Date.now()}`,
+            title: 'Street View Location',
+            folderName: 'Direct',
+            url: targetUrlParam,
+            parsed: parsedGmaps
+          };
+          handleItemClick(tempItem);
+        }
+      } else if (parsedLocations.length > 0) {
+        setMainViewMode('manager');
+        setManagerFolder(null);
+      }
+    } catch (e) {} finally {
       isLoaded.current = true;
     }
   }, []);
@@ -873,6 +960,25 @@ export default function App() {
       localStorage.removeItem('sv_active_tab_id');
     }
   }, [tabs, activeTabId]);
+
+  // Dynamic theme-color meta tag sync (Solid series standard: synchronized to Sidebar Header background)
+  useEffect(() => {
+    const themeHeaderColors: Record<string, string> = {
+      navy: '#000000',
+      dark: '#14171d',
+      light: '#ffffff',
+      mocha: '#59483A',
+      latte: '#9E8668',
+    };
+    const currentColor = themeHeaderColors[settings.theme || 'navy'] || '#000000';
+    let metaTag = document.querySelector('meta[name="theme-color"]');
+    if (!metaTag) {
+      metaTag = document.createElement('meta');
+      metaTag.setAttribute('name', 'theme-color');
+      document.head.appendChild(metaTag);
+    }
+    metaTag.setAttribute('content', currentColor);
+  }, [settings.theme]);
 
   // Save changes
   const saveLocations = (newLocs: LocationItem[]) => {
@@ -888,25 +994,6 @@ export default function App() {
       localStorage.setItem('sv_settings', JSON.stringify(newSettings));
     } catch(e) {}
   };
-
-  // Update browser theme-color meta tag dynamically based on the current theme (precisely matching header background colors)
-  useEffect(() => {
-    const themeColors = {
-      navy: '#000000',
-      dark: '#14171d',  // ダークモード時のサイドバー・ヘッダー背景色 --color-header-bg (#14171d) に完全同期
-      light: '#ffffff', // ライトモード時のサイドバー・ヘッダー背景色 --color-header-bg (#ffffff) に完全同期
-      mocha: '#59483A',
-      latte: '#9E8668',
-    };
-    const color = themeColors[settings.theme] || '#000000';
-    let meta = document.querySelector('meta[name="theme-color"]');
-    if (!meta) {
-      meta = document.createElement('meta');
-      meta.setAttribute('name', 'theme-color');
-      document.head.appendChild(meta);
-    }
-    meta.setAttribute('content', color);
-  }, [settings.theme]);
 
   // Sync Tampermonkey
   useEffect(() => {
@@ -1061,6 +1148,8 @@ export default function App() {
       let newItems: LocationItem[] = [];
       let importedTabs: TabData[] | null = null;
       let importedActiveTabId: string | null = null;
+      let importedParentOrder: string[] | null = null;
+      let importedSubOrder: Record<string, string[]> | null = null;
       
       if (file.name.endsWith('.json')) {
         try {
@@ -1069,9 +1158,15 @@ export default function App() {
             // 従来の配列形式JSON
             newItems = parsedData;
           } else if (parsedData && typeof parsedData === 'object') {
-            // タブ情報付きのバックアップ形式
+            // タブ情報・フォルダ並び順付きのバックアップ形式
             if (Array.isArray(parsedData.locations)) {
               newItems = parsedData.locations;
+            }
+            if (Array.isArray(parsedData.parentFolderOrder)) {
+              importedParentOrder = parsedData.parentFolderOrder;
+            }
+            if (parsedData.subFolderOrder && typeof parsedData.subFolderOrder === 'object') {
+              importedSubOrder = parsedData.subFolderOrder;
             }
             if (Array.isArray(parsedData.tabs)) {
               importedTabs = parsedData.tabs;
@@ -1080,17 +1175,19 @@ export default function App() {
               importedActiveTabId = parsedData.activeTabId;
             }
           }
-        } catch(err) {
-          await customAlert('JSONパースエラー');
+        } catch (err) {
+          await customAlert('JSONパースエラー: ファイル形式を確認してください。');
           return;
         }
       } else {
         const extracted = processBookmarksHtml(text);
-        newItems = extracted.map(item => ({
+        newItems = extracted.items.map(item => ({
           ...item,
           id: `item_${Date.now()}_${Math.random()}`,
           parsed: parseGoogleMapsUrl(item.url)
         }));
+        importedParentOrder = extracted.parentFolderOrder;
+        importedSubOrder = extracted.subFolderOrder;
       }
 
       if (newItems.length === 0 && (!importedTabs || importedTabs.length === 0)) {
@@ -1098,34 +1195,56 @@ export default function App() {
         return;
       }
 
-      setLocations(prev => {
-        const added: LocationItem[] = [];
-        let updatedCount = 0;
-        const newLocations = [...prev];
+      // 既存データがある場合は「完全置換（推奨）」か「追加マージ」かを確認
+      let shouldReplace = locations.length === 0;
+      if (locations.length > 0) {
+        shouldReplace = await customConfirm(
+          `既存のデータ（${locations.length}件）をこのファイルで完全に置き換えて同期しますか？\n\n【OK】: 完全に置き換えて同期（フォルダ名の変更・削除・並び順が100%反映されます）\n【キャンセル】: 既存のデータに追加してマージ`
+        );
+      }
 
-        newItems.forEach(item => {
-          const parsedItem = {
-            ...item,
-            id: item.id || `item_${Date.now()}_${Math.random()}`,
-            parsed: item.parsed || parseGoogleMapsUrl(item.url)
-          };
+      if (shouldReplace) {
+        // === 完全置き換えモード ===
+        const formattedItems = newItems.map(item => ({
+          ...item,
+          id: item.id || `item_${Date.now()}_${Math.random()}`,
+          parsed: item.parsed || parseGoogleMapsUrl(item.url)
+        }));
 
-          const existingIndex = newLocations.findIndex(i => i.url === item.url);
-          if (existingIndex !== -1) {
-            newLocations[existingIndex] = { ...newLocations[existingIndex], ...parsedItem, id: newLocations[existingIndex].id };
-            updatedCount++;
-          } else {
-            added.push(parsedItem);
-            newLocations.push(parsedItem);
-          }
-        });
+        setLocations(formattedItems);
+
+        // フォルダ並び順の復元・更新
+        if (importedParentOrder && importedParentOrder.length > 0) {
+          setParentFolderOrder(importedParentOrder);
+          try {
+            localStorage.setItem('knav_parent_folder_order', JSON.stringify(importedParentOrder));
+          } catch {}
+        } else {
+          // アイテムから抽出
+          const extractedParents: string[] = [];
+          formattedItems.forEach(it => {
+            const pName = (it.folderName || '未分類').split(' / ')[0].trim();
+            if (!extractedParents.includes(pName)) extractedParents.push(pName);
+          });
+          setParentFolderOrder(extractedParents);
+          try {
+            localStorage.setItem('knav_parent_folder_order', JSON.stringify(extractedParents));
+          } catch {}
+        }
+
+        if (importedSubOrder && Object.keys(importedSubOrder).length > 0) {
+          setSubFolderOrder(importedSubOrder);
+          try {
+            localStorage.setItem('knav_sub_folder_order', JSON.stringify(importedSubOrder));
+          } catch {}
+        }
 
         // タブ情報の復元
         if (importedTabs && importedTabs.length > 0) {
           const restoredTabs: TabData[] = importedTabs.map(t => {
             let loc = t.location;
             if (loc) {
-              const matched = newLocations.find(l => l.url === loc!.url || l.id === loc!.id);
+              const matched = formattedItems.find(l => l.url === loc!.url || l.id === loc!.id);
               if (matched) loc = matched;
             }
             return {
@@ -1142,9 +1261,94 @@ export default function App() {
         }
 
         const tabMsg = (importedTabs && importedTabs.length > 0) ? `\n開いていたタブ: ${importedTabs.length}件を復元しました` : '';
-        customAlert(`読み込み完了！\n新規追加: ${added.length}件 / 更新: ${updatedCount}件${tabMsg}`);
-        return newLocations;
-      });
+        await customAlert(`同期完了！\n全 ${formattedItems.length} 件のデータとフォルダ並び順を復元しました${tabMsg}`);
+      } else {
+        // === 追加・マージモード ===
+        setLocations(prev => {
+          const added: LocationItem[] = [];
+          let updatedCount = 0;
+          const newLocations = [...prev];
+
+          newItems.forEach(item => {
+            const parsedItem = {
+              ...item,
+              id: item.id || `item_${Date.now()}_${Math.random()}`,
+              parsed: item.parsed || parseGoogleMapsUrl(item.url)
+            };
+
+            const existingIndex = newLocations.findIndex(i => i.url === item.url);
+            if (existingIndex !== -1) {
+              newLocations[existingIndex] = { ...newLocations[existingIndex], ...parsedItem, id: newLocations[existingIndex].id };
+              updatedCount++;
+            } else {
+              added.push(parsedItem);
+              newLocations.push(parsedItem);
+            }
+          });
+
+          // フォルダ並び順のマージ
+          if (importedParentOrder && importedParentOrder.length > 0) {
+            setParentFolderOrder(prevOrder => {
+              const merged = [...prevOrder];
+              importedParentOrder!.forEach(p => {
+                if (!merged.includes(p)) merged.push(p);
+              });
+              try {
+                localStorage.setItem('knav_parent_folder_order', JSON.stringify(merged));
+              } catch {}
+              return merged;
+            });
+          }
+
+          if (importedSubOrder) {
+            setSubFolderOrder(prevSub => {
+              const merged = { ...prevSub };
+              Object.entries(importedSubOrder!).forEach(([pName, subs]) => {
+                if (!merged[pName]) {
+                  merged[pName] = subs;
+                } else {
+                  const existingSubs = [...merged[pName]];
+                  subs.forEach(s => {
+                    if (!existingSubs.includes(s)) existingSubs.push(s);
+                  });
+                  merged[pName] = existingSubs;
+                }
+              });
+              try {
+                localStorage.setItem('knav_sub_folder_order', JSON.stringify(merged));
+              } catch {}
+              return merged;
+            });
+          }
+
+          // タブ情報の復元
+          if (importedTabs && importedTabs.length > 0) {
+            const restoredTabs: TabData[] = importedTabs.map(t => {
+              let loc = t.location;
+              if (loc) {
+                const matched = newLocations.find(l => l.url === loc!.url || l.id === loc!.id);
+                if (matched) loc = matched;
+              }
+              return {
+                id: t.id || crypto.randomUUID(),
+                location: loc
+              };
+            });
+            setTabs(restoredTabs);
+            if (importedActiveTabId && restoredTabs.some(t => t.id === importedActiveTabId)) {
+              setActiveTabId(importedActiveTabId);
+            } else if (restoredTabs.length > 0) {
+              setActiveTabId(restoredTabs[0].id);
+            }
+          }
+
+          const tabMsg = (importedTabs && importedTabs.length > 0) ? `\n開いていたタブ: ${importedTabs.length}件を復元しました` : '';
+          customAlert(`読み込み完了！\n新規追加: ${added.length}件 / 更新: ${updatedCount}件${tabMsg}`);
+          return newLocations;
+        });
+      }
+
+      navigateToManagerFolder(null);
       e.target.value = '';
     };
     reader.readAsText(file);
@@ -1156,12 +1360,14 @@ export default function App() {
       return;
     }
 
-    // ブックマーク一覧に加えて、開いているタブ情報もエクスポートに含める
+    // ブックマーク一覧、開いているタブ情報、親フォルダ・サブフォルダの並び順を含めてエクスポート
     const exportPayload = {
-      version: 2,
+      version: 3,
       type: 'streetview_backup',
       exportedAt: new Date().toISOString(),
       locations,
+      parentFolderOrder,
+      subFolderOrder,
       tabs,
       activeTabId
     };
@@ -1183,15 +1389,19 @@ export default function App() {
   };
 
   const clearAllData = async () => {
-    if (await customConfirm('すべての場所データとフォルダを完全に削除します。本当によろしいですか？')) {
+    if (await customConfirm('すべての場所データ、フォルダ、および並び順設定を完全に削除します。本当によろしいですか？')) {
       setLocations([]);
       setTabs([]);
       setActiveTabId(null);
       setSelectedIds(new Set());
+      setParentFolderOrder([]);
+      setSubFolderOrder({});
       localStorage.removeItem('sv_locations_cache');
       localStorage.removeItem('sv_locations_sync');
       localStorage.removeItem('sv_tabs');
       localStorage.removeItem('sv_active_tab_id');
+      localStorage.removeItem('knav_parent_folder_order');
+      localStorage.removeItem('knav_sub_folder_order');
     }
   };
 
@@ -1323,7 +1533,7 @@ export default function App() {
   };
 
   return (
-    <div className={`flex bg-slate-950 text-slate-300 font-sans h-screen overflow-hidden select-none ${settings.theme === 'light' ? 'theme-light' : settings.theme === 'dark' ? 'theme-dark' : settings.theme === 'mocha' ? 'theme-mocha' : settings.theme === 'latte' ? 'theme-latte' : ''}`}>
+    <div className={`flex bg-slate-950 text-slate-300 font-sans h-screen overflow-hidden select-none theme-${settings.theme || 'navy'}`}>
       
       {/* リサイズ中のiframeマウスイベント横取り防止用透明オーバーレイ */}
       {isResizingSidebar && (
@@ -1556,19 +1766,26 @@ export default function App() {
             <div className="mb-2">
               <button
                 onClick={() => {
-                  setMainViewMode('manager');
-                  setManagerFolder(null);
+                  navigateToManagerFolder(null);
                 }}
-                className="w-full flex items-center justify-between px-2 py-1.5 rounded-sm border border-slate-700/60 bg-transparent hover:bg-slate-800/60 hover:border-slate-500/80 text-slate-200 hover:text-white transition-all cursor-pointer group"
+                className={`w-full flex items-center justify-between px-2 py-1.5 rounded-sm border transition-all cursor-pointer group ${
+                  mainViewMode === 'manager' && !managerFolder
+                    ? 'border-cyan-400 bg-cyan-500/15 text-cyan-300 font-black shadow-xs shadow-cyan-500/10'
+                    : 'border-slate-700/60 bg-transparent hover:bg-slate-800/60 hover:border-slate-500/80 text-slate-200 hover:text-white'
+                }`}
                 title="リスト管理（全件表示）を開く"
               >
                 <div className="flex items-center gap-1.5 min-w-0">
-                  <Folders size={14} className="text-slate-400 group-hover:text-cyan-400 transition-colors shrink-0 ml-0.5" />
+                  <Folders size={14} className={`${mainViewMode === 'manager' && !managerFolder ? 'text-cyan-400' : 'text-slate-400 group-hover:text-cyan-400'} transition-colors shrink-0 ml-0.5`} />
                   <span className="font-bold uppercase tracking-wider text-xs truncate">
                     [ ALL DATA ]
                   </span>
                 </div>
-                <span className="text-[9px] bg-slate-800/80 border border-slate-700/60 text-slate-300 font-bold px-1.5 py-0.5 rounded-sm shrink-0 mr-1">
+                <span className={`text-[9px] border font-bold px-1.5 py-0.5 rounded-sm shrink-0 mr-1 ${
+                  mainViewMode === 'manager' && !managerFolder
+                    ? 'bg-cyan-950 border-cyan-400 text-cyan-300'
+                    : 'bg-slate-800/80 border-slate-700/60 text-slate-300'
+                }`}>
                   {locations.length}
                 </span>
               </button>
@@ -1587,6 +1804,7 @@ export default function App() {
                 const fs = getSidebarFontSizePx();
                 return hierarchicalFolders.map(parent => {
                   const isParentOpen = searchQuery ? true : !!folderState[parent.name];
+                  const isParentActive = mainViewMode === 'manager' && managerFolder === parent.name;
                   const isDragOver = dragOverParentFolder === parent.name;
                   const isDragging = draggedParentFolder === parent.name;
                   
@@ -1631,18 +1849,52 @@ export default function App() {
                         </div>
 
                         <button 
-                          className="flex-1 flex items-center text-slate-200 hover:text-white transition-colors text-left min-w-0"
-                          onClick={() => toggleFolder(parent.name)}
+                          className={`flex-1 flex items-center transition-colors text-left min-w-0 cursor-pointer ${
+                            isParentActive ? 'text-cyan-300 font-bold' : 'text-slate-200 hover:text-white'
+                          }`}
+                          onClick={() => {
+                            const nextOpen = !folderState[parent.name];
+                            setFolderState(prev => ({ ...prev, [parent.name]: nextOpen }));
+                            if (nextOpen) {
+                              navigateToManagerFolder(parent.name);
+                            } else {
+                              if (managerFolder === parent.name || (managerFolder && managerFolder.startsWith(parent.name + ' / '))) {
+                                navigateToManagerFolder(null);
+                              }
+                            }
+                          }}
+                          title="クリックで開閉 / リスト表示切り替え"
                         >
-                          <ChevronRight size={14} className={`mr-1 transition-transform shrink-0 ${isParentOpen ? 'rotate-90' : ''}`} />
+                          <span
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              const nextOpen = !folderState[parent.name];
+                              setFolderState(prev => ({ ...prev, [parent.name]: nextOpen }));
+                              if (nextOpen) {
+                                navigateToManagerFolder(parent.name);
+                              } else if (managerFolder === parent.name || (managerFolder && managerFolder.startsWith(parent.name + ' / '))) {
+                                navigateToManagerFolder(null);
+                              }
+                            }}
+                            className="p-0.5 mr-0.5 hover:text-cyan-400 text-slate-400 transition-colors cursor-pointer"
+                            title={isParentOpen ? "折りたたむ" : "展開する"}
+                          >
+                            <ChevronRight size={14} className={`transition-transform shrink-0 ${isParentOpen ? 'rotate-90' : ''}`} />
+                          </span>
                           <Folder 
                             size={14} 
-                            className="mr-2 opacity-80 shrink-0 text-slate-400" 
+                            className={`mr-2 shrink-0 ${isParentActive ? 'text-cyan-400 opacity-100' : 'text-slate-400 opacity-80'}`} 
                           />
                           <span className="flex-1 truncate uppercase font-bold tracking-wider" style={{ fontSize: `${fs}px` }}>
                             {parent.name}
                           </span>
-                          <span className="text-[9px] bg-slate-800 border border-slate-700/60 text-slate-300 font-bold px-1.5 rounded-sm shrink-0 mr-2">{parent.totalCount}</span>
+                          <span className={`text-[9px] border font-bold px-1.5 rounded-sm shrink-0 mr-2 ${
+                            isParentActive 
+                              ? 'bg-cyan-950 border-cyan-400 text-cyan-300' 
+                              : 'bg-slate-800 border-slate-700/60 text-slate-300'
+                          }`}>
+                            {parent.totalCount}
+                          </span>
                         </button>
                         <div className="absolute right-1 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity bg-slate-900 px-1 rounded-sm">
                           <button onClick={(e) => editParentFolder(parent.name, e)} className="p-1 hover:text-cyan-400 text-slate-400 transition-colors cursor-pointer"><Edit2 size={12}/></button>
@@ -1655,6 +1907,7 @@ export default function App() {
                           {/* 子フォルダ */}
                           {parent.subGroups.map(sub => {
                             const isSubOpen = searchQuery ? true : !!folderState[sub.fullName];
+                            const isSubActive = mainViewMode === 'manager' && managerFolder === sub.fullName;
                             const isSubDragging = draggedSubFolder?.parentName === parent.name && draggedSubFolder?.subName === sub.subName;
                             const isSubDragOver = dragOverSubFolder?.parentName === parent.name && dragOverSubFolder?.subName === sub.subName;
                             
@@ -1702,15 +1955,47 @@ export default function App() {
                                   </div>
 
                                   <button 
-                                    className="flex-1 flex items-center text-slate-200 hover:text-white transition-colors text-left min-w-0"
-                                    onClick={() => toggleFolder(sub.fullName)}
+                                    className={`flex-1 flex items-center transition-colors text-left min-w-0 cursor-pointer ${
+                                      isSubActive ? 'text-cyan-300 font-bold' : 'text-slate-200 hover:text-white'
+                                    }`}
+                                    onClick={() => {
+                                      const nextOpen = !folderState[sub.fullName];
+                                      setFolderState(prev => ({ ...prev, [parent.name]: true, [sub.fullName]: nextOpen }));
+                                      if (nextOpen) {
+                                        navigateToManagerFolder(sub.fullName);
+                                      } else {
+                                        navigateToManagerFolder(parent.name);
+                                      }
+                                    }}
+                                    title="クリックで開閉 / リスト表示切り替え"
                                   >
-                                    <ChevronRight size={12} className={`mr-1 transition-transform shrink-0 ${isSubOpen ? 'rotate-90' : ''}`} />
-                                    <FolderOpen size={12} className="mr-2 opacity-80 shrink-0 text-slate-400" />
+                                    <span
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        const nextOpen = !folderState[sub.fullName];
+                                        setFolderState(prev => ({ ...prev, [parent.name]: true, [sub.fullName]: nextOpen }));
+                                        if (nextOpen) {
+                                          navigateToManagerFolder(sub.fullName);
+                                        } else {
+                                          navigateToManagerFolder(parent.name);
+                                        }
+                                      }}
+                                      className="p-0.5 mr-0.5 hover:text-cyan-400 text-slate-400 transition-colors cursor-pointer"
+                                      title={isSubOpen ? "折りたたむ" : "展開する"}
+                                    >
+                                      <ChevronRight size={12} className={`transition-transform shrink-0 ${isSubOpen ? 'rotate-90' : ''}`} />
+                                    </span>
+                                    <FolderOpen size={12} className={`mr-2 shrink-0 ${isSubActive ? 'text-cyan-400 opacity-100' : 'text-slate-400 opacity-80'}`} />
                                     <span className="flex-1 truncate font-bold tracking-wide" style={{ fontSize: `${Math.max(9, fs - 1)}px` }}>
                                       {sub.subName}
                                     </span>
-                                    <span className="text-[9px] bg-slate-800/80 border border-slate-700/40 text-slate-300 font-bold px-1.5 rounded-sm shrink-0 mr-2">{sub.items.length}</span>
+                                    <span className={`text-[9px] border font-bold px-1.5 rounded-sm shrink-0 mr-2 ${
+                                      isSubActive
+                                        ? 'bg-cyan-950 border-cyan-400 text-cyan-300'
+                                        : 'bg-slate-800/80 border-slate-700/40 text-slate-300'
+                                    }`}>
+                                      {sub.items.length}
+                                    </span>
                                   </button>
                                   <div className="absolute right-1 flex gap-1 opacity-0 group-hover/sub:opacity-100 transition-opacity bg-slate-900 px-1 rounded-sm">
                                     <button onClick={(e) => editFolder(sub.fullName, e)} className="p-1 hover:text-cyan-400 text-slate-400 transition-colors cursor-pointer"><Edit2 size={10}/></button>
@@ -2079,7 +2364,7 @@ export default function App() {
 
                 {(activeTab && currentItem) ? (
                   <a 
-                    href={currentItem.url} 
+                    href={getDirectStreetViewUrl(currentItem)} 
                     target="_blank" 
                     rel="noreferrer"
                     className="flex items-center gap-1 bg-transparent border border-white/20 hover:border-cyan-500 hover:bg-white/10 text-white/90 hover:text-cyan-400 font-bold text-[10px] px-2 py-1 rounded-md uppercase tracking-wider transition-colors open-map-btn shrink-0"
@@ -2296,6 +2581,19 @@ export default function App() {
                 locations={locations}
                 allFolders={allFolders}
                 initialFolder={managerFolder}
+                navigationToken={managerNavToken}
+                onFolderSelect={(folder) => {
+                  setManagerFolder(folder);
+                  if (folder) {
+                    const parts = folder.split(' / ');
+                    const parentName = parts[0].trim();
+                    setFolderState(prev => ({
+                      ...prev,
+                      [parentName]: true,
+                      ...(parts.length > 1 ? { [folder]: true } : {})
+                    }));
+                  }
+                }}
                 parentFolderOrder={parentFolderOrder}
                 onReorderParentFolders={(newOrder) => {
                   setParentFolderOrder(newOrder);
@@ -2312,10 +2610,10 @@ export default function App() {
                   handleItemClick(loc);
                 }}
                 onOpenInNewWindow={(loc) => {
-                  openInCenteredWindow(loc.url, 1920, 1100);
+                  openInCenteredWindow(loc, 1920, 1100);
                 }}
                 onOpenInNewTab={(loc) => {
-                  openInCenteredWindow(loc.url, 1920, 1100);
+                  openInCenteredWindow(loc, 1920, 1100);
                 }}
                 onEditLocation={(loc) => {
                   setEditTarget(loc);
@@ -2830,14 +3128,15 @@ function EditModal({
       return;
     }
     const finalFolder = folder.trim() || '未分類';
+    const cleanUrl = getDirectStreetViewUrl(url.trim()) || url.trim();
     
     onSave({
       id: initialData?.id || `item_${Date.now()}_${Math.random()}`,
-      url: url.trim(),
+      url: cleanUrl,
       title: title.trim() || '名称未設定',
       folderName: finalFolder,
       capturedDate: capturedDate.trim() || undefined,
-      parsed: parseGoogleMapsUrl(url.trim())
+      parsed: parseGoogleMapsUrl(cleanUrl)
     });
   };
 
