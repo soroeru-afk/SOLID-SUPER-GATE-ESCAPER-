@@ -5,7 +5,7 @@ import {
   CheckSquare, Square, X, ChevronRight,
   Database, FolderEdit, FolderMinus,
   ChevronsUp, ChevronUp, ChevronDown, ChevronsDown,
-  Check
+  Check, Copy
 } from 'lucide-react';
 
 export interface LocationItem {
@@ -51,7 +51,10 @@ export const getDirectStreetViewUrl = (urlOrLoc: string | { url?: string; parsed
     let pano = parsedObj?.pano;
     if (!pano) {
       const panoMatch = rawUrl.match(/!1s([^!&?]+)/);
-      if (panoMatch) pano = panoMatch[1];
+      if (panoMatch && !panoMatch[1].startsWith('0x')) pano = panoMatch[1];
+    }
+    if (pano && pano.startsWith('0x')) {
+      pano = undefined;
     }
 
     // heading (h)
@@ -178,6 +181,7 @@ interface LinkManagerViewProps {
   onDeleteLocation: (id: string) => void;
   onBulkDelete: (ids: string[]) => void;
   onBulkMove: (ids: string[], targetFolder: string) => void;
+  onBulkCopy?: (ids: string[], targetFolder: string) => void;
   onOpenSelectedInTabs: (ids: string[]) => void;
   onReorderItems: (newLocs: LocationItem[]) => void;
   onUpdateItem: (updated: LocationItem) => void;
@@ -210,6 +214,7 @@ export const LinkManagerView: React.FC<LinkManagerViewProps> = ({
   onDeleteLocation,
   onBulkDelete,
   onBulkMove,
+  onBulkCopy,
   onOpenSelectedInTabs,
   onReorderItems,
   onUpdateItem,
@@ -674,6 +679,16 @@ export const LinkManagerView: React.FC<LinkManagerViewProps> = ({
   const handleBulkMove = () => {
     if (!bulkTargetFolder || selectedIds.size === 0) return;
     onBulkMove(Array.from(selectedIds), bulkTargetFolder);
+    setSelectedIds(new Set());
+    setBulkTargetFolder('');
+  };
+
+  // 一括コピー保存
+  const handleBulkCopy = () => {
+    if (!bulkTargetFolder || selectedIds.size === 0) return;
+    if (onBulkCopy) {
+      onBulkCopy(Array.from(selectedIds), bulkTargetFolder);
+    }
     setSelectedIds(new Set());
     setBulkTargetFolder('');
   };
@@ -1186,18 +1201,29 @@ export const LinkManagerView: React.FC<LinkManagerViewProps> = ({
                 </button>
               </div>
 
-              {/* 一括フォルダ移動 (Move to...) */}
+              {/* 一括フォルダ移動 & コピー保存 */}
               <div className="flex items-center gap-1 border border-slate-700 bg-slate-900 rounded px-1.5 py-0.5">
                 <select
                   value={bulkTargetFolder}
                   onChange={(e) => setBulkTargetFolder(e.target.value)}
                   className="bg-transparent text-xs outline-none pr-1 max-w-[140px] font-mono cursor-pointer text-slate-200"
                 >
-                  <option value="" className="bg-slate-900 text-slate-400">Move to...</option>
+                  <option value="" className="bg-slate-900 text-slate-400">Move/Copy to...</option>
                   {allFolders.map(f => (
                     <option key={f} value={f} className="bg-slate-900 text-slate-200">{f}</option>
                   ))}
                 </select>
+                {onBulkCopy && (
+                  <button
+                    onClick={handleBulkCopy}
+                    disabled={!bulkTargetFolder}
+                    className="px-2 py-0.5 bg-slate-800 hover:bg-slate-700 text-cyan-400 hover:text-cyan-300 border border-cyan-500/40 hover:border-cyan-400 disabled:opacity-40 disabled:pointer-events-none font-bold text-[10px] rounded transition-colors uppercase cursor-pointer flex items-center gap-1"
+                    title="選択した項目を指定フォルダの一番上にコピーして保存"
+                  >
+                    <Copy size={11} />
+                    <span>{language === 'jp' ? "コピー" : "COPY"}</span>
+                  </button>
+                )}
                 <button
                   onClick={handleBulkMove}
                   disabled={!bulkTargetFolder}

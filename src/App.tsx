@@ -163,8 +163,9 @@ export const parseGoogleMapsUrl = (url: string) => {
   const lng = latLngMatch[2];
 
   let panoId: string | undefined = undefined;
+  // !1s で始まるパラメータのうち、0x...（プレイスID/CID）を除外したものが真のパノラマID
   const panoMatch = url.match(/!1s([^!&?]+)/);
-  if (panoMatch) {
+  if (panoMatch && !panoMatch[1].startsWith('0x')) {
     panoId = panoMatch[1];
   }
 
@@ -504,21 +505,8 @@ export default function App() {
       return;
     }
 
-    const currentActiveTab = tabs.find(t => t.id === activeTabId);
-
-    // 現在選択中のアクティブタブが空（locationがnull）の場合、他で開かれていても現在のタブに割り当てる
-    if (currentActiveTab && !currentActiveTab.location) {
-      setTabs(tabs.map(t => t.id === activeTabId ? { ...t, location: item } : t));
-      return;
-    }
-
-    // 現在のアクティブタブがすでに同じ場所を開いている場合は何もしない
-    if (currentActiveTab && currentActiveTab.location?.id === item.id) {
-      return;
-    }
-
-    // 現在のアクティブタブの場所を、選択した場所に切り替える（他タブにあっても独立して開ける）
-    setTabs(tabs.map(t => t.id === activeTabId ? { ...t, location: item } : t));
+    // 現在のアクティブタブの場所を、選択した場所に確実に切り替える
+    setTabs(prev => prev.map(t => t.id === activeTabId ? { ...t, location: item } : t));
   };
 
   // ストリートビューで開くボタン用（すでにタブで開いている場合はそのタブに切り替え、開いていない場合は新規タブで開く）
@@ -528,6 +516,8 @@ export default function App() {
     // 1. すでにいずれかのタブで同じ場所が開かれているかチェック
     const existingTab = tabs.find(t => t.location?.id === item.id);
     if (existingTab) {
+      // 最新のitemデータで更新して切り替え
+      setTabs(prev => prev.map(t => t.id === existingTab.id ? { ...t, location: item } : t));
       setActiveTabId(existingTab.id);
       return;
     }
@@ -535,7 +525,7 @@ export default function App() {
     // 2. 現在のアクティブタブが空（locationがnull）の場合、現在のタブに割り当てる
     const currentActiveTab = tabs.find(t => t.id === activeTabId);
     if (currentActiveTab && !currentActiveTab.location) {
-      setTabs(tabs.map(t => t.id === activeTabId ? { ...t, location: item } : t));
+      setTabs(prev => prev.map(t => t.id === activeTabId ? { ...t, location: item } : t));
       return;
     }
 
@@ -1559,7 +1549,63 @@ export default function App() {
       return;
     }
     const target = bulkTargetFolder.trim();
-    setLocations(prev => prev.map(item => selectedIds.has(item.id) ? { ...item, folderName: target } : item));
+    setLocations(prev => {
+      const movingItems: LocationItem[] = [];
+      const remainingItems: LocationItem[] = [];
+      prev.forEach(item => {
+        if (selectedIds.has(item.id)) {
+          movingItems.push({ ...item, folderName: target });
+        } else {
+          remainingItems.push(item);
+        }
+      });
+      // 宛先フォルダの先頭（一番上）に挿入
+      const firstTargetIdx = remainingItems.findIndex(i => i.folderName === target);
+      if (firstTargetIdx !== -1) {
+        remainingItems.splice(firstTargetIdx, 0, ...movingItems);
+        return remainingItems;
+      }
+      return [...movingItems, ...remainingItems];
+    });
+
+    // タブ内のlocationも連動更新
+    setTabs(prev => prev.map(t => {
+      if (t.location && selectedIds.has(t.location.id)) {
+        return { ...t, location: { ...t.location, folderName: target } };
+      }
+      return t;
+    }));
+
+    setSelectedIds(new Set());
+  };
+
+  const bulkCopy = async () => {
+    if (!bulkTargetFolder) {
+      await customAlert('コピー先のフォルダを選択してください');
+      return;
+    }
+    const target = bulkTargetFolder.trim();
+    const selectedItems = locations.filter(item => selectedIds.has(item.id));
+    if (selectedItems.length === 0) return;
+
+    const newCopiedItems: LocationItem[] = selectedItems.map(item => ({
+      ...item,
+      id: `item_${Date.now()}_${Math.random()}`,
+      folderName: target,
+    }));
+
+    const remainingItems = [...locations];
+    const firstTargetIdx = remainingItems.findIndex(i => i.folderName === target);
+    let newLocs: LocationItem[];
+    if (firstTargetIdx !== -1) {
+      remainingItems.splice(firstTargetIdx, 0, ...newCopiedItems);
+      newLocs = remainingItems;
+    } else {
+      newLocs = [...newCopiedItems, ...remainingItems];
+    }
+
+    saveLocations(newLocs);
+    setFolderState(prev => ({ ...prev, [target]: true }));
     setSelectedIds(new Set());
   };
 
@@ -1666,8 +1712,9 @@ export default function App() {
     if (item.parsed && item.parsed.isValid) {
       const p = item.parsed;
       const zoom = p.zoom || '0';
-      const panoParam = p.pano ? `panoid=${p.pano}` : `cbll=${p.lat},${p.lng}`;
-      return `https://maps.google.com/maps?layer=c&${panoParam}&cbp=0,${p.heading},0,${zoom},${p.pitch}&output=svembed`;
+      const isRealPano = p.pano && !p.pano.startsWith('0x');
+      const panoParam = isRealPano ? `panoid=${p.pano}` : `cbll=${p.lat},${p.lng}`;
+      return `https://maps.google.com/maps?layer=c&${panoParam}&cbp=0,${p.heading || 0},0,${zoom},${p.pitch || 0}&output=svembed`;
     }
     return `https://maps.google.com/maps?q=${encodeURIComponent(item.url)}&output=embed`;
   };
@@ -2359,7 +2406,7 @@ export default function App() {
                   <FolderOpen size={14} />
                   <span>{settings.language === 'jp' ? `選択した ${selectedIds.size} 件をタブ化して開く` : `Open ${selectedIds.size} in Tabs`}</span>
                 </button>
-                <div className="flex gap-2 items-center mt-1">
+                <div className="flex gap-1.5 items-center mt-1">
                   <select 
                     value={bulkTargetFolder}
                     onChange={(e) => setBulkTargetFolder(e.target.value)}
@@ -2370,6 +2417,14 @@ export default function App() {
                       <option key={f} value={f}>{f}</option>
                     ))}
                   </select>
+                  <button 
+                    onClick={bulkCopy}
+                    className="text-[10px] bg-slate-800 hover:bg-slate-700 text-cyan-400 hover:text-cyan-300 border border-cyan-500/40 hover:border-cyan-400 px-2.5 py-1.5 rounded font-bold transition-colors uppercase shrink-0 cursor-pointer flex items-center gap-1"
+                    title="選択した項目を指定フォルダの一番上にコピーして保存"
+                  >
+                    <Copy size={11} />
+                    <span>{settings.language === 'jp' ? "コピー保存" : "COPY"}</span>
+                  </button>
                   <button 
                     onClick={bulkMove}
                     className="text-[10px] bg-cyan-600 hover:bg-cyan-500 text-black px-3 py-1.5 rounded font-bold transition-colors uppercase shrink-0 cursor-pointer"
@@ -2821,13 +2876,61 @@ export default function App() {
                 }}
                 onBulkMove={(ids, targetFolder) => {
                   const setIds = new Set(ids);
-                  const newLocs = locations.map(l => {
-                    if (setIds.has(l.id)) {
-                      return { ...l, folderName: targetFolder };
+                  const target = targetFolder.trim();
+                  const movingItems: LocationItem[] = [];
+                  const remainingItems: LocationItem[] = [];
+
+                  locations.forEach(item => {
+                    if (setIds.has(item.id)) {
+                      movingItems.push({ ...item, folderName: target });
+                    } else {
+                      remainingItems.push(item);
                     }
-                    return l;
                   });
+
+                  // 移動先フォルダの先頭（一番上）に挿入
+                  const firstTargetIdx = remainingItems.findIndex(i => i.folderName === target);
+                  let newLocs: LocationItem[];
+                  if (firstTargetIdx !== -1) {
+                    remainingItems.splice(firstTargetIdx, 0, ...movingItems);
+                    newLocs = remainingItems;
+                  } else {
+                    newLocs = [...movingItems, ...remainingItems];
+                  }
+
                   saveLocations(newLocs);
+                  // タブ内のlocationも連動更新
+                  setTabs(prev => prev.map(t => {
+                    if (t.location && setIds.has(t.location.id)) {
+                      return { ...t, location: { ...t.location, folderName: target } };
+                    }
+                    return t;
+                  }));
+                }}
+                onBulkCopy={(ids, targetFolder) => {
+                  const setIds = new Set(ids);
+                  const target = targetFolder.trim();
+                  const selectedItems = locations.filter(loc => setIds.has(loc.id));
+                  if (selectedItems.length === 0) return;
+
+                  const newCopiedItems: LocationItem[] = selectedItems.map(item => ({
+                    ...item,
+                    id: `item_${Date.now()}_${Math.random()}`,
+                    folderName: target,
+                  }));
+
+                  const remainingItems = [...locations];
+                  const firstTargetIdx = remainingItems.findIndex(i => i.folderName === target);
+                  let newLocs: LocationItem[];
+                  if (firstTargetIdx !== -1) {
+                    remainingItems.splice(firstTargetIdx, 0, ...newCopiedItems);
+                    newLocs = remainingItems;
+                  } else {
+                    newLocs = [...newCopiedItems, ...remainingItems];
+                  }
+
+                  saveLocations(newLocs);
+                  setFolderState(prev => ({ ...prev, [target]: true }));
                 }}
                 onOpenSelectedInTabs={(ids) => {
                   const setIds = new Set(ids);
@@ -2920,7 +3023,7 @@ export default function App() {
                   >
                     <div className="text-slate-600 font-mono text-xs tracking-widest absolute m-4 inset-0 flex justify-center mt-12 pointer-events-none">{t('loading')}</div>
                     <iframe 
-                      key={tab.location!.id} // force re-render ONLY if this specific tab's location changes
+                      key={`${tab.id}_${tab.location!.id}_${tab.location!.url}`} 
                       src={getIframeUrl(tab.location!)} 
                       className="w-full h-full border-none absolute inset-0 z-10" 
                     />
@@ -3152,14 +3255,64 @@ export default function App() {
         {isEditModalOpen && (
           <EditModal 
             onClose={() => setIsEditModalOpen(false)}
-            onSave={(item) => {
-              setLocations(prev => {
-                const arr = [...prev];
+            onSave={(item, isCopy = false) => {
+              if (isCopy) {
+                // コピーとして保存（元の場所は維持し、新規場所として追加）
+                const newItem: LocationItem = {
+                  ...item,
+                  id: `item_${Date.now()}_${Math.random()}`
+                };
+                
+                // コピー先フォルダの先頭（一番上）に挿入
+                const firstIdx = locations.findIndex(i => i.folderName === newItem.folderName);
+                let newLocs: LocationItem[];
+                if (firstIdx !== -1) {
+                  const arr = [...locations];
+                  arr.splice(firstIdx, 0, newItem);
+                  newLocs = arr;
+                } else {
+                  newLocs = [newItem, ...locations];
+                }
+
+                saveLocations(newLocs);
+                setIsEditModalOpen(false);
+                setFolderState(prev => ({ ...prev, [newItem.folderName]: true }));
+                return;
+              }
+
+              // 通常の更新保存
+              const oldItem = locations.find(i => i.id === item.id);
+              let newLocs: LocationItem[];
+
+              // フォルダが変更された場合は、移動先フォルダの先頭（一番上）に配置
+              if (oldItem && oldItem.folderName !== item.folderName) {
+                const remaining = locations.filter(i => i.id !== item.id);
+                const firstIdx = remaining.findIndex(i => i.folderName === item.folderName);
+                if (firstIdx !== -1) {
+                  remaining.splice(firstIdx, 0, item);
+                  newLocs = remaining;
+                } else {
+                  newLocs = [item, ...remaining];
+                }
+              } else {
+                // フォルダが変わっていない場合はその場の位置で更新
+                const arr = [...locations];
                 const idx = arr.findIndex(i => i.id === item.id);
                 if (idx >= 0) arr[idx] = item;
                 else arr.push(item);
-                return arr;
-              });
+                newLocs = arr;
+              }
+
+              saveLocations(newLocs);
+
+              // 開いているタブのデータも最新情報で連動更新
+              setTabs(prev => prev.map(t => {
+                if (t.location && t.location.id === item.id) {
+                  return { ...t, location: item };
+                }
+                return t;
+              }));
+
               setIsEditModalOpen(false);
               // Ensure folder is open
               setFolderState(prev => ({ ...prev, [item.folderName]: true }));
@@ -3243,7 +3396,7 @@ function EditModal({
   customConfirm
 }: { 
   onClose: () => void, 
-  onSave: (item: LocationItem) => void, 
+  onSave: (item: LocationItem, isCopy?: boolean) => void, 
   onDelete: (id: string) => void,
   initialData: LocationItem | null,
   allFolders: string[],
@@ -3311,7 +3464,7 @@ function EditModal({
     };
   }, [url]);
 
-  const handleSave = async () => {
+  const handleSave = async (isCopy: boolean = false) => {
     if (!url.trim()) {
       await customAlert('URLを入力してください');
       return;
@@ -3320,13 +3473,13 @@ function EditModal({
     const cleanUrl = getDirectStreetViewUrl(url.trim()) || url.trim();
     
     onSave({
-      id: initialData?.id || `item_${Date.now()}_${Math.random()}`,
+      id: isCopy ? `item_${Date.now()}_${Math.random()}` : (initialData?.id || `item_${Date.now()}_${Math.random()}`),
       url: cleanUrl,
       title: title.trim() || '名称未設定',
       folderName: finalFolder,
       capturedDate: capturedDate.trim() || undefined,
       parsed: parseGoogleMapsUrl(cleanUrl)
-    });
+    }, isCopy);
   };
 
   return (
@@ -3344,7 +3497,7 @@ function EditModal({
       >
         <div className="px-5 py-4 border-b border-slate-800 flex justify-between items-center bg-slate-900">
           <h2 className="text-sm font-bold text-white">{initialData ? '場所の編集' : '場所の登録'}</h2>
-          <button onClick={onClose} className="text-slate-400 hover:text-white transition-colors">
+          <button onClick={onClose} className="text-slate-400 hover:text-white transition-colors cursor-pointer">
             <X size={18} />
           </button>
         </div>
@@ -3403,7 +3556,7 @@ function EditModal({
               <select 
                 onChange={(e) => setFolder(e.target.value)}
                 value={folder}
-                className="w-1/2 bg-slate-800 border border-slate-700 rounded-md px-3 py-2 text-sm text-white focus:border-cyan-500 focus:outline-none"
+                className="w-1/2 bg-slate-800 border border-slate-700 rounded-md px-3 py-2 text-sm text-white focus:border-cyan-500 focus:outline-none cursor-pointer"
               >
                 <option value="">▼ 入力から選択</option>
                 {allFolders.map(f => (
@@ -3427,21 +3580,31 @@ function EditModal({
               onClick={async () => {
                 if (await customConfirm('本当に削除しますか？')) onDelete(initialData.id);
               }}
-              className="px-3 py-1.5 border border-red-900 text-red-500 hover:bg-red-500 hover:text-white rounded text-xs font-bold transition-colors"
+              className="px-3 py-1.5 border border-red-900 text-red-500 hover:bg-red-500 hover:text-white rounded text-xs font-bold transition-colors cursor-pointer"
             >
               削除
             </button>
           ) : <div />}
-          <div className="flex gap-2">
+          <div className="flex items-center gap-2">
             <button 
               onClick={onClose}
-              className="px-4 py-2 border border-slate-700 text-slate-300 hover:bg-slate-800 rounded-md text-xs font-bold transition-colors"
+              className="px-3 py-2 border border-slate-700 text-slate-300 hover:bg-slate-800 rounded-md text-xs font-bold transition-colors cursor-pointer"
             >
               キャンセル
             </button>
+            {initialData && (
+              <button 
+                onClick={() => handleSave(true)}
+                className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-cyan-400 hover:text-cyan-300 border border-cyan-500/40 hover:border-cyan-400 rounded-md text-xs font-bold transition-colors shadow-sm flex items-center gap-1.5 cursor-pointer"
+                title="選択した保存先フォルダに複製して保存します（元の場所は維持されます）"
+              >
+                <Copy size={13} />
+                <span>コピーとして保存</span>
+              </button>
+            )}
             <button 
-              onClick={handleSave}
-              className="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-black rounded-md text-xs font-bold transition-colors shadow-lg shadow-cyan-500/30"
+              onClick={() => handleSave(false)}
+              className="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-black rounded-md text-xs font-bold transition-colors shadow-lg shadow-cyan-500/30 cursor-pointer"
             >
               保存
             </button>
