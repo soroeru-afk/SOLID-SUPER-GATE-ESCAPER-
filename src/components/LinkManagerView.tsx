@@ -94,12 +94,8 @@ export const getDirectStreetViewUrl = (urlOrLoc: string | { url?: string; parsed
     const pitchStr = `${pitchT.toFixed(2)}t`;
     const fov = '75y';
 
-    // AF1Qip等のユーザー投稿360写真は削除・期限切れになりやすいため、公式Googleパノラマ以外は座標ベースで安定起動
-    const isOfficialPano = pano && !pano.startsWith('AF1Qip') && !pano.startsWith('CAoS') && !pano.startsWith('0x') && !pano.startsWith('ChIJ');
-
-    if (isOfficialPano) {
-      return `https://www.google.com/maps/@${lat},${lng},3a,${fov},${headingStr},${pitchStr}/data=!3m6!1e1!3m4!1s${pano}!2e0!7i16384!8i8192`;
-    }
+    // 過去の古い撮影写真ID (pano) に固定されてしまうのを防ぎ、常にGoogleマップ最新の撮影データを開くため
+    // 座標 (lat, lng) とカメラアングル (heading, pitch) に基づいた最新ストリートビューURLを生成します
     return `https://www.google.com/maps/@${lat},${lng},3a,${fov},${headingStr},${pitchStr}/data=!3m4!1e1!3m2!1e1!2e0`;
   }
 

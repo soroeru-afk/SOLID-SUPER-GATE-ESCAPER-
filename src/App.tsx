@@ -2637,18 +2637,17 @@ export default function App() {
                 </button>
 
                 {(activeTab && currentItem) ? (
-                  <a 
-                    href={getDirectStreetViewUrl(currentItem)} 
-                    target="_blank" 
-                    rel="noreferrer"
-                    className="flex items-center gap-1 bg-transparent border border-white/20 hover:border-cyan-500 hover:bg-white/10 text-white/90 hover:text-cyan-400 font-bold text-[10px] px-2 py-1 rounded-md uppercase tracking-wider transition-colors open-map-btn shrink-0"
+                  <button 
+                    onClick={() => openInCenteredWindow(currentItem)} 
+                    className="flex items-center gap-1 bg-transparent border border-white/20 hover:border-cyan-500 hover:bg-white/10 text-white/90 hover:text-cyan-400 font-bold text-[10px] px-2 py-1 rounded-md uppercase tracking-wider transition-colors open-map-btn shrink-0 cursor-pointer"
+                    title="Googleマップを別ウィンドウ(中央ポップアップ)で開く"
                   >
                     <MapIcon size={12} /> <span className="hidden lg:inline">{t('openMap')}</span>
-                  </a>
+                  </button>
                 ) : (
                   <button 
                     disabled
-                    className="flex items-center gap-1 bg-transparent border border-white/20 text-white/90 font-bold text-[10px] px-2 py-1 rounded-md uppercase tracking-wider cursor-not-allowed shrink-0"
+                    className="flex items-center gap-1 bg-transparent border border-white/20 text-white/90 font-bold text-[10px] px-2 py-1 rounded-md uppercase tracking-wider cursor-not-allowed shrink-0 opacity-40"
                   >
                     <MapIcon size={12} /> <span className="hidden lg:inline">{t('openMap')}</span>
                   </button>
