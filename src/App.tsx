@@ -1079,14 +1079,21 @@ export default function App() {
               const existingUrls = new Set(newArray.map(i => i.url));
               syncData.forEach(item => {
                 if (!existingUrls.has(item.url)) {
-                  newArray.push({
+                  const newItem: LocationItem = {
                     id: item.id || `item_${Date.now()}_${Math.random()}`,
                     folderName: item.folderName || 'Tampermonkey追加分',
                     title: item.title,
                     url: item.url,
                     capturedDate: item.capturedDate,
                     parsed: item.parsed || parseGoogleMapsUrl(item.url)
-                  });
+                  };
+                  // カテゴリの先頭（一番上）に挿入
+                  const firstIdx = newArray.findIndex(i => i.folderName === newItem.folderName);
+                  if (firstIdx !== -1) {
+                    newArray.splice(firstIdx, 0, newItem);
+                  } else {
+                    newArray.unshift(newItem);
+                  }
                   added = true;
                   existingUrls.add(item.url);
                 }
@@ -1446,7 +1453,13 @@ export default function App() {
               updatedCount++;
             } else {
               added.push(parsedItem);
-              newLocations.push(parsedItem);
+              // カテゴリの先頭（一番上）に挿入
+              const firstIdx = newLocations.findIndex(i => i.folderName === parsedItem.folderName);
+              if (firstIdx !== -1) {
+                newLocations.splice(firstIdx, 0, parsedItem);
+              } else {
+                newLocations.unshift(parsedItem);
+              }
             }
           });
 
@@ -3316,12 +3329,23 @@ export default function App() {
                 return;
               }
 
-              // 通常の更新保存
+              // 通常の更新・新規保存
               const oldItem = locations.find(i => i.id === item.id);
               let newLocs: LocationItem[];
 
-              // フォルダが変更された場合は、移動先フォルダの先頭（一番上）に配置
-              if (oldItem && oldItem.folderName !== item.folderName) {
+              if (!oldItem) {
+                // ★ 新規場所の登録（サイドバーの「新しい場所を登録」やマネージャーからの追加など）
+                // 登録先フォルダの先頭（一番上）に挿入
+                const firstIdx = locations.findIndex(i => i.folderName === item.folderName);
+                if (firstIdx !== -1) {
+                  const arr = [...locations];
+                  arr.splice(firstIdx, 0, item);
+                  newLocs = arr;
+                } else {
+                  newLocs = [item, ...locations];
+                }
+              } else if (oldItem.folderName !== item.folderName) {
+                // フォルダが変更された場合は、移動先フォルダの先頭（一番上）に配置
                 const remaining = locations.filter(i => i.id !== item.id);
                 const firstIdx = remaining.findIndex(i => i.folderName === item.folderName);
                 if (firstIdx !== -1) {
@@ -3331,15 +3355,16 @@ export default function App() {
                   newLocs = [item, ...remaining];
                 }
               } else {
-                // フォルダが変わっていない場合はその場の位置で更新
+                // フォルダが変わっていない既存アイテムの編集は、その場の位置で更新
                 const arr = [...locations];
                 const idx = arr.findIndex(i => i.id === item.id);
                 if (idx >= 0) arr[idx] = item;
-                else arr.push(item);
+                else arr.unshift(item);
                 newLocs = arr;
               }
 
               saveLocations(newLocs);
+              setSortOrder('custom');
 
               // 開いているタブのデータも最新情報で連動更新
               setTabs(prev => prev.map(t => {
