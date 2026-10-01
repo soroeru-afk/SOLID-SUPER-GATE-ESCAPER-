@@ -1762,9 +1762,16 @@ export default function App() {
     }
     if (p && p.isValid && p.lat && p.lng) {
       const zoom = p.zoom || '0';
-      // ユーザー投稿360写真(AF1Qip/CAoS)や期限切れパノラマIDによる「ストリートビューを表示できません」を完全防止
-      // cbll(緯度経度)を指定することで、Googleが自動的にその地点の最新・有効な公式ストリートビューを表示します
-      return `https://maps.google.com/maps?layer=c&cbll=${p.lat},${p.lng}&cbp=0,${p.heading || 0},0,${zoom},${p.pitch || 0}&output=svembed`;
+      const isOfficialPano = p.pano && !p.pano.startsWith('AF1Qip') && !p.pano.startsWith('CAoS') && !p.pano.startsWith('0x') && !p.pano.startsWith('ChIJ') && !p.pano.startsWith('search') && p.pano.length >= 10;
+      
+      if (isOfficialPano) {
+        // 公式GoogleストリートビューIDがある場合は panoid を指定
+        // これにより、原宿や繁華街などの個人投稿写真・店舗内写真への誤吸着を防ぎ、道路の公式ストリートビューを確実に表示
+        return `https://maps.google.com/maps?layer=c&panoid=${p.pano}&cbll=${p.lat},${p.lng}&cbp=12,${p.heading || 0},0,${zoom},${p.pitch || 0}&output=svembed`;
+      }
+      
+      // ユーザー投稿写真(AF1Qip等)やパノラマID不明の場合は座標ベースで最新公式写真に自動吸着
+      return `https://maps.google.com/maps?layer=c&cbll=${p.lat},${p.lng}&cbp=12,${p.heading || 0},0,${zoom},${p.pitch || 0}&output=svembed`;
     }
     return `https://maps.google.com/maps?q=${encodeURIComponent(item.url)}&output=embed`;
   };
