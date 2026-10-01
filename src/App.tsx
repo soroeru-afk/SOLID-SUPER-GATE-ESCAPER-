@@ -1032,25 +1032,6 @@ export default function App() {
     } catch(e) {}
   }, [locations]);
 
-  // Dynamic theme-color meta tag sync (Solid series standard: synchronized to Sidebar Header background)
-  useEffect(() => {
-    const themeHeaderColors: Record<string, string> = {
-      navy: '#000000',
-      dark: '#14171d',
-      light: '#ffffff',
-      mocha: '#59483A',
-      latte: '#9E8668',
-    };
-    const currentColor = themeHeaderColors[settings.theme || 'navy'] || '#000000';
-    let metaTag = document.querySelector('meta[name="theme-color"]');
-    if (!metaTag) {
-      metaTag = document.createElement('meta');
-      metaTag.setAttribute('name', 'theme-color');
-      document.head.appendChild(metaTag);
-    }
-    metaTag.setAttribute('content', currentColor);
-  }, [settings.theme]);
-
   // Save changes
   const saveLocations = (newLocs: LocationItem[]) => {
     setLocations(newLocs);
@@ -1065,6 +1046,25 @@ export default function App() {
       localStorage.setItem('sv_settings', JSON.stringify(newSettings));
     } catch(e) {}
   };
+
+  // Update browser theme-color meta tag dynamically based on the current theme (precisely matching header background colors)
+  useEffect(() => {
+    const themeColors = {
+      navy: '#000000',
+      dark: '#14171d',  // ダークモード時のサイドバー・ヘッダー背景色 --color-header-bg (#14171d) に完全同期
+      light: '#ffffff', // ライトモード時のサイドバー・ヘッダー背景色 --color-header-bg (#ffffff) に完全同期
+      mocha: '#59483A',
+      latte: '#9E8668',
+    };
+    const color = themeColors[settings.theme] || '#000000';
+    let meta = document.querySelector('meta[name="theme-color"]');
+    if (!meta) {
+      meta = document.createElement('meta');
+      meta.setAttribute('name', 'theme-color');
+      document.head.appendChild(meta);
+    }
+    meta.setAttribute('content', color);
+  }, [settings.theme]);
 
   // Sync Tampermonkey
   useEffect(() => {
@@ -1777,7 +1777,7 @@ export default function App() {
   };
 
   return (
-    <div className={`flex bg-slate-950 text-slate-300 font-sans h-screen overflow-hidden select-none theme-${settings.theme || 'navy'}`}>
+    <div className={`flex bg-slate-950 text-slate-300 font-sans h-screen overflow-hidden select-none ${settings.theme === 'light' ? 'theme-light' : settings.theme === 'dark' ? 'theme-dark' : settings.theme === 'mocha' ? 'theme-mocha' : settings.theme === 'latte' ? 'theme-latte' : ''}`}>
       
       {/* リサイズ中のiframeマウスイベント横取り防止用透明オーバーレイ */}
       {isResizingSidebar && (
@@ -2020,16 +2020,25 @@ export default function App() {
                 title="リスト管理（全件表示）を開く"
               >
                 <div className="flex items-center gap-1.5 min-w-0">
-                  <Folders size={14} className={`${mainViewMode === 'manager' && !managerFolder ? 'text-cyan-400' : 'text-slate-400 group-hover:text-cyan-400'} transition-colors shrink-0 ml-0.5`} />
-                  <span className="font-bold uppercase tracking-wider text-xs truncate">
+                  <Folders 
+                    size={Math.max(13, Math.min(18, Math.round(getSidebarFontSizePx() * 1.1)))} 
+                    className={`${mainViewMode === 'manager' && !managerFolder ? 'text-cyan-400' : 'text-slate-400 group-hover:text-cyan-400'} transition-colors shrink-0 ml-0.5`} 
+                  />
+                  <span 
+                    className="font-bold uppercase tracking-wider truncate"
+                    style={{ fontSize: `${getSidebarFontSizePx()}px` }}
+                  >
                     [ ALL DATA ]
                   </span>
                 </div>
-                <span className={`text-[9px] border font-bold px-1.5 py-0.5 rounded-sm shrink-0 mr-1 ${
-                  mainViewMode === 'manager' && !managerFolder
-                    ? 'bg-cyan-950 border-cyan-400 text-cyan-300'
-                    : 'bg-slate-800/80 border-slate-700/60 text-slate-300'
-                }`}>
+                <span 
+                  className={`border font-bold px-1.5 py-0.5 rounded-sm shrink-0 mr-1 ${
+                    mainViewMode === 'manager' && !managerFolder
+                      ? 'bg-cyan-950 border-cyan-400 text-cyan-300'
+                      : 'bg-slate-800/80 border-slate-700/60 text-slate-300'
+                  }`}
+                  style={{ fontSize: `${Math.max(9, Math.round(getSidebarFontSizePx() * 0.75))}px` }}
+                >
                   {locations.length}
                 </span>
               </button>
