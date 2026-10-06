@@ -12,6 +12,11 @@
   --scrollbar-thumb-hover: rgba(255, 255, 255, 0.2);
 }
 
+.theme-navy {
+  --color-header-bg: #000000;
+  --color-overlay-bg: #000000;
+}
+
 /* Light Theme Overrides (Solid Series Standard Slate-Gray & Clean Ice Palette) */
 .theme-light {
   --color-slate-950: #f8fafc; /* メイン背景：清潔感のある白に近いオフホワイト */
@@ -86,34 +91,147 @@
   background-color: #262b36 !important;
 }
 
-/* Mocha Theme Overrides (Warm Dark Brown) */
+/* Mocha Theme Overrides (Rich Dark Chocolate #59483A Header + High Contrast Warm Mocha Body) */
 .theme-mocha {
-  --color-slate-950: #fdf5eb;
-  --color-slate-900: #f5e8dc;
-  --color-slate-800: #dcbfa9;
+  --color-slate-950: #fdf5eb; /* メイン背景：モカクリーム */
+  --color-slate-900: #f5e8dc; /* カード・コンテナ */
+  --color-slate-800: #dcbfa9; /* 境界線・枠 */
   --color-slate-700: #c4a48b;
   --color-slate-600: #a8856a;
-  --color-slate-500: #755943;
-  --color-slate-400: #5c4331;
-  --color-slate-300: #473424;
-  --color-slate-200: #332418;
-  --color-slate-100: #241911;
-  --color-slate-50: #140d08;
-  --color-white: #1c130d;
-  --color-black: #f5e8dc;
+  --color-slate-500: #6b4c35; /* サブテキスト */
+  --color-slate-400: #543b27; /* 通常テキスト */
+  --color-slate-300: #3d2a1b; /* 濃い文字 */
+  --color-slate-200: #2a1c12; /* タイトル・見出し */
+  --color-slate-100: #1c130d; /* 最も濃い見出し */
+  --color-slate-50: #0f0805;
+  --color-white: #1c130d;    /* メインボディ内の濃色テキスト */
+  --color-black: #f5e8dc;    /* アクセントボタン内の文字 */
   
-  --color-header-bg: #59483A;
-  --color-overlay-bg: #fdf5eb;
+  --color-header-bg: #59483A; /* 焦げ茶色（元通りのダークチョコレートヘッダー） */
+  --color-overlay-bg: #59483A;
   
   --scrollbar-thumb: rgba(90, 60, 40, 0.15);
   --scrollbar-thumb-hover: rgba(90, 60, 40, 0.25);
   
-  /* Override cyan to a warm caramel accent for Mocha */
-  --color-cyan-900: #1c130d;
-  --color-cyan-700: #473424;
-  --color-cyan-600: #a8856a;
-  --color-cyan-500: #755943;
-  --color-cyan-400: #5c4331;
+  /* Accent Colors (Warm Chocolate & Caramel) */
+  --color-cyan-950: #f5e8dc;
+  --color-cyan-900: #241911;
+  --color-cyan-800: #332418;
+  --color-cyan-700: #543b27;
+  --color-cyan-600: #8c6d53;
+  --color-cyan-500: #a8856a;
+  --color-cyan-400: #c4a48b;
+  --color-cyan-300: #4a3321;
+  --color-cyan-200: #2a1c12;
+}
+
+/* Mocha ヘッダー内の白文字・白抜き表示の完全復元 (SOLID SUPER GATE ESCAPER, LIST MANAGER, LOCATION 等) */
+.theme-mocha .bg-header-bg,
+.theme-mocha .location-header-bar {
+  background-color: #59483A !important;
+}
+
+.theme-mocha .bg-header-bg h1,
+.theme-mocha .bg-header-bg h2,
+.theme-mocha .location-header-bar .location-title-text {
+  color: #fdf5eb !important;
+}
+
+.theme-mocha .bg-header-bg h1 {
+  background: none !important;
+  -webkit-text-fill-color: #fdf5eb !important;
+}
+
+.theme-mocha .bg-header-bg .text-cyan-500,
+.theme-mocha .bg-header-bg .text-cyan-600,
+.theme-mocha .location-header-bar .text-slate-400,
+.theme-mocha .location-header-bar .text-white\/90 {
+  color: #dcbfa9 !important;
+}
+
+.theme-mocha .location-header-bar .border-white\/20 {
+  border-color: rgba(220, 191, 169, 0.35) !important;
+}
+
+.theme-mocha .slider-value-text,
+.theme-latte .slider-value-text {
+  color: #fdf5eb !important;
+}
+
+/* プルダウンメニュー内の文字色がヘッダーの上書きで白飛びするのを完全に防止 */
+.theme-dropdown-menu,
+.theme-mocha .theme-dropdown-menu,
+.theme-latte .theme-dropdown-menu,
+.theme-light .theme-dropdown-menu {
+  background-color: #14161a !important;
+  border-color: #334155 !important;
+}
+
+.theme-dropdown-menu span,
+.theme-mocha .theme-dropdown-menu span,
+.theme-latte .theme-dropdown-menu span {
+  color: #cbd5e1 !important;
+}
+
+.theme-dropdown-menu .active-theme-item span {
+  color: #22d3ee !important;
+}
+
+.theme-mocha .theme-dropdown-menu .active-theme-item span,
+.theme-mocha .theme-dropdown-menu .active-theme-item svg {
+  color: #dcbfa9 !important;
+}
+
+.theme-latte .theme-dropdown-menu .active-theme-item span,
+.theme-latte .theme-dropdown-menu .active-theme-item svg {
+  color: #b5a086 !important;
+}
+
+.theme-light .theme-dropdown-menu .active-theme-item span,
+.theme-light .theme-dropdown-menu .active-theme-item svg {
+  color: #38bdf8 !important;
+}
+
+/* Mocha & Latte: サイドバー最上部 [ ALL DATA ] 選択時のカラー最適化 (青緑の違和感を解消し、シックな焦げ茶＆白文字へ) */
+.theme-mocha .sidebar-all-data-active {
+  background-color: #59483A !important;
+  border-color: #7a5c43 !important;
+  color: #ffffff !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18) !important;
+}
+
+.theme-mocha .sidebar-all-data-active span,
+.theme-mocha .sidebar-all-data-active svg {
+  color: #ffffff !important;
+}
+
+.theme-mocha .sidebar-all-data-badge-active {
+  background-color: #3d2a1b !important;
+  border-color: #7a5c43 !important;
+  color: #fdf5eb !important;
+}
+
+.theme-latte .sidebar-all-data-active {
+  background-color: #66523d !important;
+  border-color: #8c765c !important;
+  color: #ffffff !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12) !important;
+}
+
+.theme-latte .sidebar-all-data-active span,
+.theme-latte .sidebar-all-data-active svg {
+  color: #ffffff !important;
+}
+
+.theme-latte .sidebar-all-data-badge-active {
+  background-color: #4a3a29 !important;
+  border-color: #8c765c !important;
+  color: #F5F0E6 !important;
+}
+
+/* Override sidebar border in mocha theme */
+.theme-mocha .sidebar-container {
+  border-color: #dcbfa9 !important;
 }
 
 /* Latte Theme Overrides (Warm Light Beige/Cafe au lait) */
@@ -139,11 +257,38 @@
   --scrollbar-thumb-hover: rgba(90, 60, 40, 0.25);
   
   /* Override cyan to a warm coffee accent for Latte */
+  --color-cyan-950: #efe3d5;
   --color-cyan-900: #22180e;
+  --color-cyan-800: #3a2b1c;
   --color-cyan-700: #4a3a29;
   --color-cyan-600: #8c765c;
   --color-cyan-500: #66523d;
   --color-cyan-400: #7A6652;
+  --color-cyan-300: #4a3a29;
+  --color-cyan-200: #22180e;
+}
+
+.theme-latte .bg-header-bg,
+.theme-latte .location-header-bar {
+  background-color: #9E8668 !important;
+}
+
+.theme-latte .bg-header-bg h1,
+.theme-latte .bg-header-bg h2,
+.theme-latte .location-header-bar .location-title-text {
+  color: #ffffff !important;
+}
+
+.theme-latte .bg-header-bg h1 {
+  background: none !important;
+  -webkit-text-fill-color: #ffffff !important;
+}
+
+.theme-latte .bg-header-bg .text-cyan-500,
+.theme-latte .bg-header-bg .text-cyan-600,
+.theme-latte .location-header-bar .text-slate-400,
+.theme-latte .location-header-bar .text-white\/90 {
+  color: #f5ede4 !important;
 }
 
 /* Global scrollbar styling to make it subtle across all browsers */
@@ -173,6 +318,14 @@
   }
   .theme-light .custom-checkbox, .theme-latte .custom-checkbox, .theme-mocha .custom-checkbox {
     @apply bg-slate-100 border-slate-400;
+  }
+  .theme-mocha .custom-checkbox:checked {
+    background-color: #8c6d53 !important;
+    border-color: #8c6d53 !important;
+  }
+  .theme-latte .custom-checkbox:checked {
+    background-color: #8c765c !important;
+    border-color: #8c765c !important;
   }
   .custom-checkbox:hover {
     @apply border-slate-500;
@@ -234,64 +387,9 @@
   }
 }
 
-.theme-mocha .bg-header-bg {
-  --color-white: #f5e8dc;
-  --color-slate-400: #dcbfa9;
-}
-
-.theme-mocha .bg-header-bg {
-  --color-cyan-500: #dcbfa9;
-}
-
-/* Override text colors in header for mocha theme */
-.theme-mocha .h-12.bg-header-bg\/80 .text-white\/90,
-.theme-mocha .h-12.bg-header-bg\/80 .text-white {
-  color: #fdf5eb !important;
-}
-
-.theme-mocha .h-12.bg-header-bg\/80 .hover\:text-white:hover {
-  color: #ffffff !important;
-}
-
-.theme-mocha .h-12.bg-header-bg\/80 .border-white\/20 {
-  border-color: rgba(253, 245, 235, 0.2) !important;
-}
-
-.theme-mocha .h-12.bg-header-bg\/80 .hover\:bg-white\/20:hover {
-  background-color: rgba(253, 245, 235, 0.2) !important;
-}
-
-.theme-mocha .h-12.bg-header-bg\/80 .hover\:bg-white\/10:hover {
-  background-color: rgba(253, 245, 235, 0.1) !important;
-}
-
-/* Also for the sidebar header if needed */
-.theme-mocha .bg-header-bg .text-white\/90,
-.theme-mocha .bg-header-bg .text-white {
-  color: #fdf5eb !important;
-}
-
-.theme-mocha .h-12.bg-header-bg\/80 input[type="range"] {
-  accent-color: #fdf5eb !important;
-}
-
-
-.theme-mocha .h-12.bg-header-bg\/80 .open-map-btn:hover {
-  background-color: rgba(28, 19, 13, 0.1) !important;
-  border-color: #1c130d !important;
-}
-
 /* Override sidebar border in mocha theme */
 .theme-mocha .sidebar-container {
-  border-color: rgba(0, 0, 0, 0.4) !important;
-}
-
-/* Fix language toggle in Mocha header to use Latte theme colors */
-.theme-mocha .lang-toggle-container {
-  --color-slate-400: #33261a;
-  --color-slate-900: #F2E8DC;
-  --color-slate-800: #d4c5b0;
-  --color-slate-700: #b5a086;
+  border-color: rgba(90, 60, 40, 0.25) !important;
 }
 
 /* === Solid Square Series Custom Slider === */
@@ -309,10 +407,19 @@
   border: 1px solid #363d4c;
 }
 
-.theme-light .solid-square-slider,
-.theme-latte .solid-square-slider {
+.theme-light .solid-square-slider {
   background: #cbd5e1;
   border-color: #94a3b8;
+}
+
+.theme-latte .solid-square-slider {
+  background: #4a3a29 !important;
+  border-color: #33261a !important;
+}
+
+.theme-mocha .solid-square-slider {
+  background: #140d08 !important;
+  border-color: #332418 !important;
 }
 
 .theme-dark .solid-square-slider {

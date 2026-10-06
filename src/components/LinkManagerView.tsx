@@ -529,6 +529,8 @@ export const LinkManagerView: React.FC<LinkManagerViewProps> = ({
     }
   };
 
+  const [lastSelectedId, setLastSelectedId] = useState<string | null>(null);
+
   // 全選択 / 解除
   const toggleSelectAll = () => {
     if (selectedIds.size === filteredItems.length && filteredItems.length > 0) {
@@ -536,10 +538,40 @@ export const LinkManagerView: React.FC<LinkManagerViewProps> = ({
     } else {
       setSelectedIds(new Set(filteredItems.map(item => item.id)));
     }
+    setLastSelectedId(null);
   };
 
   const toggleSelectItem = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
+
+    // Shift + クリックによる範囲選択 / 範囲解除 (上から下、任意の位置間をまとめて選択・解除)
+    if (e.shiftKey && lastSelectedId) {
+      const fromIdx = filteredItems.findIndex(item => item.id === lastSelectedId);
+      const toIdx = filteredItems.findIndex(item => item.id === id);
+
+      if (fromIdx !== -1 && toIdx !== -1) {
+        const start = Math.min(fromIdx, toIdx);
+        const end = Math.max(fromIdx, toIdx);
+        const rangeItems = filteredItems.slice(start, end + 1);
+
+        // クリックした要素がすでに選択状態なら範囲解除、未選択なら範囲選択
+        const shouldSelect = !selectedIds.has(id);
+        const next = new Set(selectedIds);
+
+        rangeItems.forEach(item => {
+          if (shouldSelect) {
+            next.add(item.id);
+          } else {
+            next.delete(item.id);
+          }
+        });
+
+        setSelectedIds(next);
+        setLastSelectedId(id);
+        return;
+      }
+    }
+
     const next = new Set(selectedIds);
     if (next.has(id)) {
       next.delete(id);
@@ -547,6 +579,7 @@ export const LinkManagerView: React.FC<LinkManagerViewProps> = ({
       next.add(id);
     }
     setSelectedIds(next);
+    setLastSelectedId(id);
   };
 
   // URLの短縮フォーマット（Google Mapsの長いパラメータを削って短く表示）

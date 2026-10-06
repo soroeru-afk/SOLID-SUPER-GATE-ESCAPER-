@@ -294,6 +294,14 @@ const DEFAULT_SETTINGS: AppSettings = {
   listFontSize: 12,
 };
 
+const THEME_OPTIONS = [
+  { id: 'navy', label: 'NAVY', color: '#2563eb' },
+  { id: 'dark', label: 'DARK', color: '#334155' },
+  { id: 'light', label: 'LIGHT', color: '#38bdf8' },
+  { id: 'mocha', label: 'MOCHA', color: '#a8856a' },
+  { id: 'latte', label: 'LATTE', color: '#d4c5b0' },
+] as const;
+
 // === Main App Component ===
 export default function App() {
   const [locations, setLocations] = useState<LocationItem[]>(() => {
@@ -314,6 +322,26 @@ export default function App() {
   const [bulkTargetFolder, setBulkTargetFolder] = useState('');
   const [isSelectMode, setIsSelectMode] = useState(false);
   const [sortOrder, setSortOrder] = useState<'custom' | 'asc' | 'desc'>('custom');
+  const [isThemeMenuOpen, setIsThemeMenuOpen] = useState(false);
+  const themeMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!isThemeMenuOpen) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (themeMenuRef.current && !themeMenuRef.current.contains(e.target as Node)) {
+        setIsThemeMenuOpen(false);
+      }
+    };
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setIsThemeMenuOpen(false);
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isThemeMenuOpen]);
   
   const tabsContainerRef = useRef<HTMLDivElement>(null);
   const tabRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
@@ -1032,6 +1060,25 @@ export default function App() {
     } catch(e) {}
   }, [locations]);
 
+  // Dynamic theme-color meta tag sync (Solid series standard: synchronized to Sidebar Header background)
+  useEffect(() => {
+    const themeHeaderColors: Record<string, string> = {
+      navy: '#000000',
+      dark: '#14171d',
+      light: '#ffffff',
+      mocha: '#59483A',
+      latte: '#9E8668',
+    };
+    const currentColor = themeHeaderColors[settings.theme || 'navy'] || '#000000';
+    let metaTag = document.querySelector('meta[name="theme-color"]');
+    if (!metaTag) {
+      metaTag = document.createElement('meta');
+      metaTag.setAttribute('name', 'theme-color');
+      document.head.appendChild(metaTag);
+    }
+    metaTag.setAttribute('content', currentColor);
+  }, [settings.theme]);
+
   // Save changes
   const saveLocations = (newLocs: LocationItem[]) => {
     setLocations(newLocs);
@@ -1046,25 +1093,6 @@ export default function App() {
       localStorage.setItem('sv_settings', JSON.stringify(newSettings));
     } catch(e) {}
   };
-
-  // Update browser theme-color meta tag dynamically based on the current theme (precisely matching header background colors)
-  useEffect(() => {
-    const themeColors = {
-      navy: '#000000',
-      dark: '#14171d',  // ダークモード時のサイドバー・ヘッダー背景色 --color-header-bg (#14171d) に完全同期
-      light: '#ffffff', // ライトモード時のサイドバー・ヘッダー背景色 --color-header-bg (#ffffff) に完全同期
-      mocha: '#59483A',
-      latte: '#9E8668',
-    };
-    const color = themeColors[settings.theme] || '#000000';
-    let meta = document.querySelector('meta[name="theme-color"]');
-    if (!meta) {
-      meta = document.createElement('meta');
-      meta.setAttribute('name', 'theme-color');
-      document.head.appendChild(meta);
-    }
-    meta.setAttribute('content', color);
-  }, [settings.theme]);
 
   // Sync Tampermonkey
   useEffect(() => {
@@ -1307,6 +1335,64 @@ export default function App() {
   const toggleFolder = (folderName: string) => {
     if (searchQuery) return; // Expand all automatically if searching
     setFolderState(prev => ({ ...prev, [folderName]: !prev[folderName] }));
+  };
+
+  const [sidebarLastSelectedId, setSidebarLastSelectedId] = useState<string | null>(null);
+
+  // サイドバーで現在展開・表示されているアイテムの平坦化リスト（Shift + クリック範囲選択用）
+  const visibleSidebarItems = useMemo(() => {
+    const list: LocationItem[] = [];
+    hierarchicalFolders.forEach(parent => {
+      const isParentOpen = searchQuery ? true : !!folderState[parent.name];
+      if (isParentOpen) {
+        parent.subGroups.forEach(sub => {
+          const isSubOpen = searchQuery ? true : !!folderState[sub.fullName];
+          if (isSubOpen) {
+            list.push(...sub.items);
+          }
+        });
+        list.push(...parent.directItems);
+      }
+    });
+    return list;
+  }, [hierarchicalFolders, folderState, searchQuery]);
+
+  const handleSidebarItemClick = (item: LocationItem, e: React.MouseEvent) => {
+    if (isSelectMode) {
+      if (e.shiftKey && sidebarLastSelectedId) {
+        const fromIdx = visibleSidebarItems.findIndex(i => i.id === sidebarLastSelectedId);
+        const toIdx = visibleSidebarItems.findIndex(i => i.id === item.id);
+
+        if (fromIdx !== -1 && toIdx !== -1) {
+          const start = Math.min(fromIdx, toIdx);
+          const end = Math.max(fromIdx, toIdx);
+          const rangeItems = visibleSidebarItems.slice(start, end + 1);
+
+          const shouldSelect = !selectedIds.has(item.id);
+          const newSet = new Set(selectedIds);
+
+          rangeItems.forEach(ri => {
+            if (shouldSelect) {
+              newSet.add(ri.id);
+            } else {
+              newSet.delete(ri.id);
+            }
+          });
+
+          setSelectedIds(newSet);
+          setSidebarLastSelectedId(item.id);
+          return;
+        }
+      }
+
+      const newSet = new Set(selectedIds);
+      if (newSet.has(item.id)) newSet.delete(item.id);
+      else newSet.add(item.id);
+      setSelectedIds(newSet);
+      setSidebarLastSelectedId(item.id);
+    } else {
+      handleItemClick(item);
+    }
   };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1777,7 +1863,7 @@ export default function App() {
   };
 
   return (
-    <div className={`flex bg-slate-950 text-slate-300 font-sans h-screen overflow-hidden select-none ${settings.theme === 'light' ? 'theme-light' : settings.theme === 'dark' ? 'theme-dark' : settings.theme === 'mocha' ? 'theme-mocha' : settings.theme === 'latte' ? 'theme-latte' : ''}`}>
+    <div className={`flex bg-slate-950 text-slate-300 font-sans h-screen overflow-hidden select-none theme-${settings.theme || 'navy'}`}>
       
       {/* リサイズ中のiframeマウスイベント横取り防止用透明オーバーレイ */}
       {isResizingSidebar && (
@@ -1963,10 +2049,12 @@ export default function App() {
                     <span>{settings.language === 'jp' ? `タブ化 (${selectedIds.size})` : `TABS (${selectedIds.size})`}</span>
                   </button>
                 )}
+                {/* 選択ボタン */}
                 <button 
                   onClick={() => {
                     setIsSelectMode(!isSelectMode);
                     if (isSelectMode) setSelectedIds(new Set()); // モード切替時に選択リセット
+                    setSidebarLastSelectedId(null);
                   }} 
                   className={`transition-colors whitespace-nowrap px-2.5 py-0.5 rounded-full border font-bold tracking-wider uppercase text-[10px] cursor-pointer ${
                     isSelectMode 
@@ -1976,22 +2064,33 @@ export default function App() {
                 >
                   {isSelectMode ? t('selectDone') : t('select')}
                 </button>
+
+                {/* すべて開く / すべて閉じる トグルボタン (OPEN / CLOSE) - 固定幅で文字数変更による伸縮・位置ズレを完全防止 */}
+                <button
+                  onClick={() => {
+                    const isAllOpen = allFolders.length > 0 && allFolders.every(k => !!folderState[k]);
+                    if (isAllOpen) {
+                      setFolderState({});
+                    } else {
+                      setFolderState(allFolders.reduce((acc, k) => ({ ...acc, [k]: true }), {}));
+                    }
+                  }}
+                  className={`transition-colors whitespace-nowrap w-[66px] justify-center py-0.5 rounded-full border font-bold tracking-wider uppercase text-[10px] cursor-pointer flex items-center gap-1 shrink-0 ${
+                    allFolders.length > 0 && allFolders.every(k => !!folderState[k])
+                      ? 'bg-cyan-950/80 border-cyan-500/60 text-cyan-300 shadow-xs'
+                      : 'bg-slate-800/40 hover:bg-slate-800/80 hover:text-white text-slate-300 border-slate-700/60'
+                  }`}
+                  title={allFolders.length > 0 && allFolders.every(k => !!folderState[k]) ? "すべて折りたたむ (CLOSE ALL)" : "すべて展開 (OPEN ALL)"}
+                >
+                  <span className="text-[8px] leading-none">
+                    {allFolders.length > 0 && allFolders.every(k => !!folderState[k]) ? '▼' : '▶'}
+                  </span>
+                  <span>
+                    {allFolders.length > 0 && allFolders.every(k => !!folderState[k]) ? 'CLOSE' : 'OPEN'}
+                  </span>
+                </button>
                 
-                <div className="flex items-center gap-1.5 ml-1">
-                  <button 
-                    onClick={() => setFolderState(allFolders.reduce((acc, k) => ({...acc, [k]: true}), {}))} 
-                    className="hover:text-slate-200 text-slate-400 transition-colors cursor-pointer p-0.5" 
-                    title="すべて展開 (Expand All)"
-                  >
-                    <Plus size={13} />
-                  </button>
-                  <button 
-                    onClick={() => setFolderState({})} 
-                    className="hover:text-slate-200 text-slate-400 transition-colors cursor-pointer p-0.5" 
-                    title="すべて折りたたむ (Collapse All)"
-                  >
-                    <Minus size={13} />
-                  </button>
+                <div className="flex items-center gap-1.5 ml-0.5">
                   <button 
                     onClick={() => window.location.reload()} 
                     className="hover:text-slate-200 text-slate-400 transition-colors cursor-pointer p-0.5" 
@@ -2012,21 +2111,21 @@ export default function App() {
                 onClick={() => {
                   navigateToManagerFolder(null);
                 }}
-                className={`w-full flex items-center justify-between px-2 py-1.5 rounded-sm border transition-all cursor-pointer group ${
+                className={`w-full flex items-center justify-between px-2.5 py-2 rounded-sm border transition-all cursor-pointer group ${
                   mainViewMode === 'manager' && !managerFolder
-                    ? 'border-cyan-400 bg-cyan-500/15 text-cyan-300 font-black shadow-xs shadow-cyan-500/10'
+                    ? 'sidebar-all-data-active border-cyan-400 bg-cyan-500/15 text-cyan-300 font-black shadow-xs shadow-cyan-500/10'
                     : 'border-slate-700/60 bg-transparent hover:bg-slate-800/60 hover:border-slate-500/80 text-slate-200 hover:text-white'
                 }`}
                 title="リスト管理（全件表示）を開く"
               >
-                <div className="flex items-center gap-1.5 min-w-0">
+                <div className="flex items-center gap-2 min-w-0">
                   <Folders 
-                    size={Math.max(13, Math.min(18, Math.round(getSidebarFontSizePx() * 1.1)))} 
+                    size={Math.max(15, Math.min(22, Math.round(getSidebarFontSizePx() * 1.25)))} 
                     className={`${mainViewMode === 'manager' && !managerFolder ? 'text-cyan-400' : 'text-slate-400 group-hover:text-cyan-400'} transition-colors shrink-0 ml-0.5`} 
                   />
                   <span 
                     className="font-bold uppercase tracking-wider truncate"
-                    style={{ fontSize: `${getSidebarFontSizePx()}px` }}
+                    style={{ fontSize: `${Math.round(getSidebarFontSizePx() * 1.15 + 1)}px` }}
                   >
                     [ ALL DATA ]
                   </span>
@@ -2034,10 +2133,10 @@ export default function App() {
                 <span 
                   className={`border font-bold px-1.5 py-0.5 rounded-sm shrink-0 mr-1 ${
                     mainViewMode === 'manager' && !managerFolder
-                      ? 'bg-cyan-950 border-cyan-400 text-cyan-300'
+                      ? 'sidebar-all-data-badge-active bg-cyan-950 border-cyan-400 text-cyan-300'
                       : 'bg-slate-800/80 border-slate-700/60 text-slate-300'
                   }`}
-                  style={{ fontSize: `${Math.max(9, Math.round(getSidebarFontSizePx() * 0.75))}px` }}
+                  style={{ fontSize: `${Math.max(10, Math.round(getSidebarFontSizePx() * 0.85))}px` }}
                 >
                   {locations.length}
                 </span>
@@ -2101,39 +2200,34 @@ export default function App() {
                           <GripVertical size={13} />
                         </div>
 
-                        <button 
-                          className={`flex-1 flex items-center transition-colors text-left min-w-0 cursor-pointer ${
+                        <div 
+                          className={`flex-1 flex items-center transition-colors text-left min-w-0 cursor-pointer select-none ${
                             isParentActive ? 'text-cyan-300 font-bold' : 'text-slate-200 hover:text-white'
                           }`}
                           onClick={() => {
                             const nextOpen = !folderState[parent.name];
                             setFolderState(prev => ({ ...prev, [parent.name]: nextOpen }));
-                            if (nextOpen) {
-                              navigateToManagerFolder(parent.name);
-                            } else {
-                              if (managerFolder === parent.name || (managerFolder && managerFolder.startsWith(parent.name + ' / '))) {
+                            if (mainViewMode === 'manager') {
+                              if (nextOpen) {
+                                navigateToManagerFolder(parent.name);
+                              } else if (managerFolder === parent.name || (managerFolder && managerFolder.startsWith(parent.name + ' / '))) {
                                 navigateToManagerFolder(null);
                               }
                             }
                           }}
                           title="クリックで開閉 / リスト表示切り替え"
                         >
-                          <span
+                          <button
+                            type="button"
                             onClick={(e) => {
                               e.stopPropagation();
-                              const nextOpen = !folderState[parent.name];
-                              setFolderState(prev => ({ ...prev, [parent.name]: nextOpen }));
-                              if (nextOpen) {
-                                navigateToManagerFolder(parent.name);
-                              } else if (managerFolder === parent.name || (managerFolder && managerFolder.startsWith(parent.name + ' / '))) {
-                                navigateToManagerFolder(null);
-                              }
+                              setFolderState(prev => ({ ...prev, [parent.name]: !prev[parent.name] }));
                             }}
                             className="p-0.5 mr-0.5 hover:text-cyan-400 text-slate-400 transition-colors cursor-pointer"
                             title={isParentOpen ? "折りたたむ" : "展開する"}
                           >
                             <ChevronRight size={14} className={`transition-transform shrink-0 ${isParentOpen ? 'rotate-90' : ''}`} />
-                          </span>
+                          </button>
                           <Folder 
                             size={14} 
                             className={`mr-2 shrink-0 ${isParentActive ? 'text-cyan-400 opacity-100' : 'text-slate-400 opacity-80'}`} 
@@ -2148,7 +2242,7 @@ export default function App() {
                           }`}>
                             {parent.totalCount}
                           </span>
-                        </button>
+                        </div>
                         <div className="absolute right-1 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity bg-slate-900 px-1 rounded-sm">
                           <button onClick={(e) => editParentFolder(parent.name, e)} className="p-1 hover:text-cyan-400 text-slate-400 transition-colors cursor-pointer"><Edit2 size={12}/></button>
                           <button onClick={(e) => deleteParentFolder(parent.name, e)} className="p-1 hover:text-red-400 text-slate-400 transition-colors cursor-pointer"><Trash2 size={12}/></button>
@@ -2207,37 +2301,34 @@ export default function App() {
                                     <GripVertical size={11} />
                                   </div>
 
-                                  <button 
-                                    className={`flex-1 flex items-center transition-colors text-left min-w-0 cursor-pointer ${
+                                  <div 
+                                    className={`flex-1 flex items-center transition-colors text-left min-w-0 cursor-pointer select-none ${
                                       isSubActive ? 'text-cyan-300 font-bold' : 'text-slate-200 hover:text-white'
                                     }`}
                                     onClick={() => {
                                       const nextOpen = !folderState[sub.fullName];
                                       setFolderState(prev => ({ ...prev, [parent.name]: true, [sub.fullName]: nextOpen }));
-                                      if (nextOpen) {
-                                        navigateToManagerFolder(sub.fullName);
-                                      } else {
-                                        navigateToManagerFolder(parent.name);
-                                      }
-                                    }}
-                                    title="クリックで開閉 / リスト表示切り替え"
-                                  >
-                                    <span
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        const nextOpen = !folderState[sub.fullName];
-                                        setFolderState(prev => ({ ...prev, [parent.name]: true, [sub.fullName]: nextOpen }));
+                                      if (mainViewMode === 'manager') {
                                         if (nextOpen) {
                                           navigateToManagerFolder(sub.fullName);
                                         } else {
                                           navigateToManagerFolder(parent.name);
                                         }
+                                      }
+                                    }}
+                                    title="クリックで開閉 / リスト表示切り替え"
+                                  >
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setFolderState(prev => ({ ...prev, [parent.name]: true, [sub.fullName]: !prev[sub.fullName] }));
                                       }}
                                       className="p-0.5 mr-0.5 hover:text-cyan-400 text-slate-400 transition-colors cursor-pointer"
                                       title={isSubOpen ? "折りたたむ" : "展開する"}
                                     >
                                       <ChevronRight size={12} className={`transition-transform shrink-0 ${isSubOpen ? 'rotate-90' : ''}`} />
-                                    </span>
+                                    </button>
                                     <FolderOpen size={12} className={`mr-2 shrink-0 ${isSubActive ? 'text-cyan-400 opacity-100' : 'text-slate-400 opacity-80'}`} />
                                     <span className="flex-1 truncate font-bold tracking-wide" style={{ fontSize: `${Math.max(9, fs - 1)}px` }}>
                                       {sub.subName}
@@ -2249,7 +2340,7 @@ export default function App() {
                                     }`}>
                                       {sub.items.length}
                                     </span>
-                                  </button>
+                                  </div>
                                   <div className="absolute right-1 flex gap-1 opacity-0 group-hover/sub:opacity-100 transition-opacity bg-slate-900 px-1 rounded-sm">
                                     <button onClick={(e) => editFolder(sub.fullName, e)} className="p-1 hover:text-cyan-400 text-slate-400 transition-colors cursor-pointer"><Edit2 size={10}/></button>
                                     <button onClick={(e) => deleteFolder(sub.fullName, e)} className="p-1 hover:text-red-400 text-slate-400 transition-colors cursor-pointer"><Trash2 size={10}/></button>
@@ -2268,16 +2359,7 @@ export default function App() {
                                             flex items-center py-1.5 px-2 rounded-sm cursor-pointer border-l-2 transition-colors group/item relative
                                             ${isActive ? 'bg-cyan-500/20 border-cyan-500 text-white font-bold' : 'border-transparent text-slate-200 hover:bg-slate-800/60 hover:text-white'}
                                           `}
-                                          onClick={() => {
-                                            if (isSelectMode) {
-                                              const newSet = new Set(selectedIds);
-                                              if (newSet.has(item.id)) newSet.delete(item.id);
-                                              else newSet.add(item.id);
-                                              setSelectedIds(newSet);
-                                            } else {
-                                              handleItemClick(item);
-                                            }
-                                          }}
+                                          onClick={(e) => handleSidebarItemClick(item, e)}
                                         >
                                           {isSelectMode && (
                                             <div className="mr-3 flex items-center justify-center shrink-0">
@@ -2356,16 +2438,7 @@ export default function App() {
                                   flex items-center py-1.5 px-2 rounded-sm cursor-pointer border-l-2 transition-colors group/item relative
                                   ${isActive ? 'bg-cyan-500/20 border-cyan-500 text-white font-bold' : 'border-transparent text-slate-200 hover:bg-slate-800/60 hover:text-white'}
                                 `}
-                                onClick={() => {
-                                  if (isSelectMode) {
-                                    const newSet = new Set(selectedIds);
-                                    if (newSet.has(item.id)) newSet.delete(item.id);
-                                    else newSet.add(item.id);
-                                    setSelectedIds(newSet);
-                                  } else {
-                                    handleItemClick(item);
-                                  }
-                                }}
+                                onClick={(e) => handleSidebarItemClick(item, e)}
                               >
                                 {isSelectMode && (
                                   <div className="mr-3 flex items-center justify-center shrink-0">
@@ -2543,7 +2616,7 @@ export default function App() {
         </div>
 
         {/* === Main Content === */}
-        <div className="flex-1 bg-black flex flex-col relative z-10 min-w-0">
+        <div className="flex-1 bg-slate-950 flex flex-col relative z-10 min-w-0">
           
           {/* Floating Show UI Handle (UIを隠した時のみ画面上部に極薄・半透明で配置、ホバー時のみ表示) */}
           {isImmersive && (
@@ -2572,7 +2645,7 @@ export default function App() {
           {/* Header Area (always visible to maintain height) */}
           {!isImmersive && (
             <div 
-              className="h-12 border-b border-slate-800 bg-header-bg/80 backdrop-blur-md flex items-center justify-between shrink-0 z-20 relative flex-nowrap overflow-hidden px-3 sm:px-4 location-header-bar"
+              className="h-12 border-b border-slate-800 bg-header-bg/80 backdrop-blur-md flex items-center justify-between shrink-0 z-30 relative flex-nowrap overflow-visible px-3 sm:px-4 location-header-bar"
               style={{ 
                 marginRight: (isSidebarOpen && settings.sidebarPosition === 'right') ? `${settings.sidebarWidth}px` : '0px',
                 marginLeft: (isSidebarOpen && settings.sidebarPosition === 'left') ? `${settings.sidebarWidth}px` : '0px',
@@ -2608,7 +2681,7 @@ export default function App() {
                         className="w-14 sm:w-16 solid-square-slider"
                         title={`不透明度: ${Math.round((settings.sidebarOpacity ?? 1) * 100)}%`}
                       />
-                      <span className="text-[9px] font-mono text-cyan-400 font-bold w-5 text-right">
+                      <span className="slider-value-text text-[9px] font-mono text-cyan-400 font-bold w-5 text-right">
                         {Math.round((settings.sidebarOpacity ?? 1) * 100)}
                       </span>
                     </div>
@@ -2628,7 +2701,7 @@ export default function App() {
                         className="w-14 sm:w-16 solid-square-slider"
                         title={`文字サイズ: ${getSidebarFontSizePx()}px`}
                       />
-                      <span className="text-[9px] font-mono text-cyan-400 font-bold w-6 text-right">
+                      <span className="slider-value-text text-[9px] font-mono text-cyan-400 font-bold w-6 text-right">
                         {getSidebarFontSizePx()}P
                       </span>
                     </div>
@@ -2637,19 +2710,86 @@ export default function App() {
                   </div>
                 )}
 
-                <button 
-                  onClick={() => {
-                    const themes = ['navy', 'dark', 'light', 'mocha', 'latte'] as const;
-                    const currentIndex = themes.indexOf(settings.theme || 'navy');
-                    const nextTheme = themes[(currentIndex + 1) % themes.length];
-                    saveSettings({ ...settings, theme: nextTheme });
-                  }}
-                  className="flex items-center justify-center gap-1.5 border border-white/20 hover:border-cyan-500 hover:bg-white/10 text-[10px] text-white/90 hover:text-cyan-400 font-bold px-2 py-1 rounded-md uppercase tracking-wider transition-colors shrink-0 w-[78px]"
-                  title={`テーマ切り替え: ${(settings.theme || 'navy').toUpperCase()}`}
-                >
-                  <Palette size={12} className="shrink-0" />
-                  <span>{settings.theme || 'navy'}</span>
-                </button>
+                {/* テーマ切り替えスプリットボタン (左: クリックで次へトグル / 右: プルダウン展開) */}
+                <div className="relative shrink-0 flex items-center" ref={themeMenuRef}>
+                  <div className="flex items-center rounded-md border border-white/20 bg-slate-900/90 hover:border-cyan-500 overflow-hidden text-[10px] font-bold text-white shadow-xs">
+                    {/* 左側: テーマ直接切り替え (Toggle) */}
+                    <button 
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        const themeIds = THEME_OPTIONS.map(t => t.id);
+                        const currentIndex = themeIds.indexOf(settings.theme || 'navy');
+                        const nextTheme = themeIds[(currentIndex + 1) % themeIds.length];
+                        saveSettings({ ...settings, theme: nextTheme });
+                      }}
+                      className="flex items-center gap-1.5 px-2.5 py-1 hover:bg-slate-800 hover:text-cyan-400 transition-colors cursor-pointer"
+                      title={`クリックで次のテーマへ切り替え (現在: ${(settings.theme || 'navy').toUpperCase()})`}
+                    >
+                      <span 
+                        className="w-2.5 h-2.5 rounded-full shrink-0 shadow-xs" 
+                        style={{ 
+                          backgroundColor: THEME_OPTIONS.find(t => t.id === (settings.theme || 'navy'))?.color || '#2563eb' 
+                        }} 
+                      />
+                      <span className="font-mono uppercase">{settings.theme || 'navy'}</span>
+                    </button>
+
+                    {/* 右側: プルダウン展開ボタン (Dropdown Arrow) */}
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setIsThemeMenuOpen(prev => !prev);
+                      }}
+                      className={`px-1.5 py-1 border-l border-white/20 hover:bg-slate-800 transition-colors cursor-pointer flex items-center justify-center ${
+                        isThemeMenuOpen ? 'bg-slate-800 text-cyan-400' : 'text-slate-400 hover:text-white'
+                      }`}
+                      title="テーマ一覧メニューを開く"
+                    >
+                      <ChevronDown size={11} className={`transition-transform duration-150 ${isThemeMenuOpen ? 'rotate-180 text-cyan-400' : ''}`} />
+                    </button>
+                  </div>
+
+                  {/* プルダウンメニューポップアップ */}
+                  {isThemeMenuOpen && (
+                    <div className="theme-dropdown-menu absolute top-full right-0 mt-1.5 z-[999] w-48 bg-slate-900 border border-slate-700/90 rounded-lg shadow-2xl backdrop-blur-md overflow-hidden flex flex-col py-1 animate-in fade-in duration-100">
+                      <div className="px-3 py-1.5 border-b border-slate-800/80 text-[10px] font-bold text-slate-300 flex items-center gap-1.5 bg-slate-950/60">
+                        <span>🎨</span>
+                        <span>テーマ切り替え</span>
+                      </div>
+                      <div className="flex flex-col py-1">
+                        {THEME_OPTIONS.map(tOpt => {
+                          const isCurrent = (settings.theme || 'navy') === tOpt.id;
+                          return (
+                            <button
+                              type="button"
+                              key={tOpt.id}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                saveSettings({ ...settings, theme: tOpt.id });
+                                setIsThemeMenuOpen(false);
+                              }}
+                              className={`w-full flex items-center justify-between px-3 py-2 text-xs font-mono font-bold transition-colors cursor-pointer ${
+                                isCurrent
+                                  ? 'active-theme-item bg-cyan-500/20 text-cyan-400'
+                                  : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                              }`}
+                            >
+                              <div className="flex items-center gap-2.5">
+                                <span className="w-2.5 h-2.5 rounded-full shrink-0 shadow-xs" style={{ backgroundColor: tOpt.color }} />
+                                <span className="uppercase tracking-wider">{tOpt.label}</span>
+                              </div>
+                              {isCurrent && (
+                                <Check size={14} className="text-cyan-400 shrink-0" />
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </div>
 
                 {/* ビューア / リスト編集マネージャー切り替えボタン */}
                 <button 
