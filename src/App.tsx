@@ -26,7 +26,7 @@ interface LocationItem {
 interface AppSettings {
   sidebarPosition: 'left' | 'right';
   sidebarWidth: number;
-  theme: 'navy' | 'dark' | 'light' | 'mocha' | 'latte';
+  theme: 'navy' | 'dark' | 'light' | 'mocha' | 'latte' | 'pink' | 'paper' | 'red';
   language: 'jp' | 'en';
   folderIconColor?: string;
   sidebarOpacity?: number;
@@ -69,6 +69,9 @@ const translations = {
     light: 'ライト',
     mocha: 'モカ',
     latte: 'ラテ',
+    pink: 'ローズ',
+    paper: 'ペーパー',
+    red: 'レッド',
     close: '閉じる',
     desc: '瞬時に場所を移動できる自分専用のどこでもドア',
     tmTitle: '💡 Tampermonkey連携機能:',
@@ -125,6 +128,9 @@ const translations = {
     light: 'Light',
     mocha: 'Mocha',
     latte: 'Latte',
+    pink: 'Rose',
+    paper: 'Paper',
+    red: 'Red',
     close: 'Close',
     desc: 'Your personal portal to travel anywhere instantly',
     tmTitle: '💡 Tampermonkey Integration:',
@@ -300,6 +306,9 @@ const THEME_OPTIONS = [
   { id: 'light', label: 'LIGHT', color: '#38bdf8' },
   { id: 'mocha', label: 'MOCHA', color: '#a8856a' },
   { id: 'latte', label: 'LATTE', color: '#d4c5b0' },
+  { id: 'paper', label: 'PAPER', color: '#e05638' },
+  { id: 'pink', label: 'ROSE', color: '#8C4D58' },
+  { id: 'red', label: 'RED', color: '#9e2a2a' },
 ] as const;
 
 // === Main App Component ===
@@ -1068,6 +1077,10 @@ export default function App() {
       light: '#ffffff',
       mocha: '#59483A',
       latte: '#9E8668',
+      pink: '#26151a',
+      rose: '#26151a',
+      red: '#241113',
+      paper: '#ffffff',
     };
     const currentColor = themeHeaderColors[settings.theme || 'navy'] || '#000000';
     let metaTag = document.querySelector('meta[name="theme-color"]');
@@ -2578,7 +2591,7 @@ export default function App() {
           {/* Footer actions */}
           <div className="p-3 border-t border-slate-800 shrink-0 flex flex-col gap-2">
             <button 
-              className="w-full flex justify-center items-center gap-2 bg-cyan-600 hover:bg-cyan-500 text-black text-xs font-bold py-2 rounded-md transition-colors"
+              className="w-full flex justify-center items-center gap-2 register-location-btn bg-cyan-600 hover:bg-cyan-500 text-black text-xs font-bold py-2 rounded-md transition-colors cursor-pointer shadow-xs"
               onClick={() => {
                 setEditTarget(null);
                 setIsEditModalOpen(true);
@@ -2724,7 +2737,7 @@ export default function App() {
                         saveSettings({ ...settings, theme: nextTheme });
                       }}
                       className="flex items-center gap-1.5 px-2.5 py-1 hover:bg-slate-800 hover:text-cyan-400 transition-colors cursor-pointer"
-                      title={`クリックで次のテーマへ切り替え (現在: ${(settings.theme || 'navy').toUpperCase()})`}
+                      title={`クリックで次のテーマへ切り替え (現在: ${THEME_OPTIONS.find(t => t.id === (settings.theme || 'navy'))?.label || 'NAVY'})`}
                     >
                       <span 
                         className="w-2.5 h-2.5 rounded-full shrink-0 shadow-xs" 
@@ -2732,7 +2745,7 @@ export default function App() {
                           backgroundColor: THEME_OPTIONS.find(t => t.id === (settings.theme || 'navy'))?.color || '#2563eb' 
                         }} 
                       />
-                      <span className="font-mono uppercase">{settings.theme || 'navy'}</span>
+                      <span className="font-mono uppercase">{THEME_OPTIONS.find(t => t.id === (settings.theme || 'navy'))?.label || 'NAVY'}</span>
                     </button>
 
                     {/* 右側: プルダウン展開ボタン (Dropdown Arrow) */}

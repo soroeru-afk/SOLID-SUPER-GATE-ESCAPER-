@@ -291,6 +291,330 @@
   color: #f5ede4 !important;
 }
 
+/* Pink Theme Overrides (Dark Plum & Neon Rose Pink #e05297) */
+/* Pink Theme Overrides (Dark Dusty Rose & Dusty Pink #E06C8B) */
+/* Pink Theme Overrides (Dark Vintage Mauve & Dark Dusty Pink #8C4D58) */
+.theme-pink {
+  --color-slate-950: #1a1215; /* メイン背景：ダークヴィンテージローズ */
+  --color-slate-900: #24181c; /* カード・コンテナ */
+  --color-slate-800: #38242a; /* 境界線・サブ背景 */
+  --color-slate-700: #52343c; /* 枠線 */
+  --color-slate-600: #704752; 
+  --color-slate-500: #966370; /* サブテキスト */
+  --color-slate-400: #b8828f; /* 通常テキスト */
+  --color-slate-300: #daa8b4; /* 濃い文字 */
+  --color-slate-200: #f0cfd7; /* 明るい見出し */
+  --color-slate-100: #fcf0f3; /* 白・見出し文字 */
+  --color-slate-50: #fff5f7;
+  --color-white: #ffffff;
+  --color-black: #ffffff;
+  
+  --color-header-bg: #26151a; /* 上部ヘッダー背景 */
+  --color-overlay-bg: #1a1215;
+  
+  --scrollbar-thumb: rgba(140, 77, 88, 0.25);
+  --scrollbar-thumb-hover: rgba(140, 77, 88, 0.45);
+  
+  /* Pink Accent Palette (Base #8C4D58) */
+  --color-cyan-950: #291418;
+  --color-cyan-900: #3b1c22;
+  --color-cyan-800: #542730;
+  --color-cyan-700: #703844;
+  --color-cyan-600: #8C4D58; /* 暗めダスティピンク #8C4D58 */
+  --color-cyan-500: #8C4D58; /* メインアクセント #8C4D58 */
+  --color-cyan-400: #b5707e; /* 明るいテキストアクセント */
+  --color-cyan-300: #d89ba6;
+  --color-cyan-200: #f7dcd0;
+}
+
+.theme-pink .bg-header-bg,
+.theme-pink .location-header-bar {
+  background-color: #26151a !important;
+}
+
+.theme-pink .bg-header-bg h1,
+.theme-pink .bg-header-bg h2,
+.theme-pink .location-header-bar .location-title-text {
+  color: #fcf0f3 !important;
+}
+
+.theme-pink .bg-header-bg h1 {
+  background: none !important;
+  -webkit-text-fill-color: #fcf0f3 !important;
+}
+
+.theme-pink .bg-header-bg .text-cyan-500,
+.theme-pink .bg-header-bg .text-cyan-600,
+.theme-pink .location-header-bar .text-slate-400,
+.theme-pink .location-header-bar .text-white\/90 {
+  color: #b5707e !important;
+}
+
+.theme-pink .sidebar-container {
+  border-color: #38242a !important;
+}
+
+.theme-pink .sidebar-all-data-active {
+  background-color: #3d1f25 !important;
+  border-color: #8C4D58 !important;
+  color: #fcf0f3 !important;
+  box-shadow: 0 0 10px rgba(140, 77, 88, 0.3) !important;
+}
+
+.theme-pink .sidebar-all-data-active span,
+.theme-pink .sidebar-all-data-active svg {
+  color: #fcf0f3 !important;
+}
+
+.theme-pink .sidebar-all-data-badge-active {
+  background-color: #291418 !important;
+  border-color: #8C4D58 !important;
+  color: #d89ba6 !important;
+}
+
+.theme-pink .slider-value-text {
+  color: #b5707e !important;
+}
+
+.theme-pink .solid-square-slider {
+  background: #140d0f !important;
+  border-color: #38242a !important;
+}
+
+.theme-pink .theme-dropdown-menu .active-theme-item span,
+.theme-pink .theme-dropdown-menu .active-theme-item svg {
+  color: #b5707e !important;
+}
+
+.theme-pink .custom-checkbox:checked {
+  background-color: #8C4D58 !important;
+  border-color: #8C4D58 !important;
+}
+
+.theme-pink .register-location-btn {
+  background-color: #8C4D58 !important;
+  color: #ffffff !important;
+  border: 1px solid #a35b68 !important;
+}
+
+.theme-pink .register-location-btn:hover {
+  background-color: #a05764 !important;
+  border-color: #b86977 !important;
+}
+
+/* Red Theme Overrides (Muted Dark Ruby Crimson #9e2a2a) */
+.theme-red {
+  --color-slate-950: #140b0c; /* メイン背景：ダークルビーブラック */
+  --color-slate-900: #1f1214; /* カード・コンテナ */
+  --color-slate-800: #331c20; /* 境界線・サブ背景 */
+  --color-slate-700: #4a282d; /* 枠線 */
+  --color-slate-600: #6b3941; 
+  --color-slate-500: #995560; /* サブテキスト */
+  --color-slate-400: #c47c87; /* 通常テキスト */
+  --color-slate-300: #e3b1b8; /* 濃い文字 */
+  --color-slate-200: #f5d7dc; /* 明るい見出し */
+  --color-slate-100: #fcf0f2; /* 白・見出し文字 */
+  --color-slate-50: #fff5f6;
+  --color-white: #ffffff;
+  --color-black: #ffffff;
+  
+  --color-header-bg: #241113; /* 上部ヘッダー背景：ダーククリムゾン */
+  --color-overlay-bg: #140b0c;
+  
+  --scrollbar-thumb: rgba(158, 42, 42, 0.25);
+  --scrollbar-thumb-hover: rgba(158, 42, 42, 0.45);
+  
+  /* Red Accent Palette (Muted Stoic Crimson #9e2a2a) */
+  --color-cyan-950: #260c0e;
+  --color-cyan-900: #381215;
+  --color-cyan-800: #52191d;
+  --color-cyan-700: #702025;
+  --color-cyan-600: #8a2424;
+  --color-cyan-500: #9e2a2a; /* 落ち着いたクリムゾンレッド */
+  --color-cyan-400: #be3e3e; /* 柔らかいレッドテキスト */
+  --color-cyan-300: #db6b6b;
+  --color-cyan-200: #fcf0f2;
+}
+
+.theme-red .bg-header-bg,
+.theme-red .location-header-bar {
+  background-color: #241113 !important;
+}
+
+.theme-red .bg-header-bg h1,
+.theme-red .bg-header-bg h2,
+.theme-red .location-header-bar .location-title-text {
+  color: #fcf0f2 !important;
+}
+
+.theme-red .bg-header-bg h1 {
+  background: none !important;
+  -webkit-text-fill-color: #fcf0f2 !important;
+}
+
+.theme-red .bg-header-bg .text-cyan-500,
+.theme-red .bg-header-bg .text-cyan-600,
+.theme-red .location-header-bar .text-slate-400,
+.theme-red .location-header-bar .text-white\/90 {
+  color: #be3e3e !important;
+}
+
+.theme-red .sidebar-container {
+  border-color: #331c20 !important;
+}
+
+.theme-red .sidebar-all-data-active {
+  background-color: #3b1414 !important;
+  border-color: #9e2a2a !important;
+  color: #fcf0f2 !important;
+  box-shadow: 0 0 8px rgba(158, 42, 42, 0.25) !important;
+}
+
+.theme-red .sidebar-all-data-active span,
+.theme-red .sidebar-all-data-active svg {
+  color: #fcf0f2 !important;
+}
+
+.theme-red .sidebar-all-data-badge-active {
+  background-color: #240c0c !important;
+  border-color: #9e2a2a !important;
+  color: #db6b6b !important;
+}
+
+.theme-red .slider-value-text {
+  color: #be3e3e !important;
+}
+
+.theme-red .solid-square-slider {
+  background: #140b0c !important;
+  border-color: #331c20 !important;
+}
+
+.theme-red .theme-dropdown-menu .active-theme-item span,
+.theme-red .theme-dropdown-menu .active-theme-item svg {
+  color: #be3e3e !important;
+}
+
+.theme-red .custom-checkbox:checked {
+  background-color: #9e2a2a !important;
+  border-color: #9e2a2a !important;
+}
+
+/* トーンを抑えた落ち着いたシックなレッド */
+.theme-red .register-location-btn {
+  background-color: #822222 !important;
+  color: #ffffff !important;
+  border: 1px solid #9c2a2a !important;
+}
+
+.theme-red .register-location-btn:hover {
+  background-color: #992929 !important;
+  border-color: #b53333 !important;
+}
+
+/* Paper Theme Overrides (Clean Paper-White & Terracotta Vermilion #e05638) */
+.theme-paper {
+  --color-slate-950: #f8f9fa; /* メイン背景：ペーパーホワイト */
+  --color-slate-900: #ffffff; /* カード・コンテナ：純白 */
+  --color-slate-800: #e2e8f0; /* 境界線・枠 */
+  --color-slate-700: #cbd5e1;
+  --color-slate-600: #94a3b8; 
+  --color-slate-500: #64748b; /* サブテキスト */
+  --color-slate-400: #475569; /* 通常テキスト */
+  --color-slate-300: #1e293b; /* 濃い文字 */
+  --color-slate-200: #0f172a; /* 最も濃い見出し文字 */
+  --color-slate-100: #0f172a; /* クッキリ濃い文字 */
+  --color-slate-50: #020617;
+  --color-white: #0f172a;    /* 反転文字 */
+  --color-black: #ffffff;    /* ボタン内の白文字 */
+  
+  --color-header-bg: #ffffff; /* 上部ヘッダー背景：ペーパーホワイト */
+  --color-overlay-bg: #1e293b;
+  
+  --scrollbar-thumb: rgba(224, 86, 56, 0.2);
+  --scrollbar-thumb-hover: rgba(224, 86, 56, 0.4);
+  
+  /* Paper Accent Palette (Terracotta Vermilion) */
+  --color-cyan-950: #fde8e3;
+  --color-cyan-900: #fbd3c9;
+  --color-cyan-800: #f7a896;
+  --color-cyan-700: #f07b61;
+  --color-cyan-600: #e05638; /* テラコッタ・テラコッタレッド */
+  --color-cyan-500: #e05638; 
+  --color-cyan-400: #c94426; /* 濃いアクセントテキスト */
+  --color-cyan-300: #1e293b;
+  --color-cyan-200: #0f172a;
+}
+
+.theme-paper .bg-header-bg,
+.theme-paper .location-header-bar {
+  background-color: #ffffff !important;
+  border-color: #e2e8f0 !important;
+}
+
+.theme-paper .bg-header-bg h1,
+.theme-paper .bg-header-bg h2,
+.theme-paper .location-header-bar .location-title-text {
+  color: #0f172a !important;
+}
+
+.theme-paper .bg-header-bg h1 {
+  background: none !important;
+  -webkit-text-fill-color: #0f172a !important;
+}
+
+.theme-paper .bg-header-bg .text-cyan-500,
+.theme-paper .bg-header-bg .text-cyan-600,
+.theme-paper .location-header-bar .text-slate-400,
+.theme-paper .location-header-bar .text-white\/90 {
+  color: #e05638 !important;
+}
+
+.theme-paper .location-header-bar .border-white\/20 {
+  border-color: rgba(224, 86, 56, 0.3) !important;
+}
+
+.theme-paper .slider-value-text {
+  color: #e05638 !important;
+}
+
+.theme-paper .sidebar-container {
+  border-color: #e2e8f0 !important;
+}
+
+.theme-paper .sidebar-all-data-active {
+  background-color: #fde8e3 !important;
+  border-color: #e05638 !important;
+  color: #c94426 !important;
+  box-shadow: 0 1px 3px rgba(224, 86, 56, 0.15) !important;
+}
+
+.theme-paper .sidebar-all-data-active span,
+.theme-paper .sidebar-all-data-active svg {
+  color: #c94426 !important;
+}
+
+.theme-paper .sidebar-all-data-badge-active {
+  background-color: #ffffff !important;
+  border-color: #e05638 !important;
+  color: #c94426 !important;
+}
+
+.theme-paper .solid-square-slider {
+  background: #cbd5e1 !important;
+  border-color: #94a3b8 !important;
+}
+
+.theme-paper .theme-dropdown-menu .active-theme-item span,
+.theme-paper .theme-dropdown-menu .active-theme-item svg {
+  color: #e05638 !important;
+}
+
+.theme-paper .custom-checkbox:checked {
+  background-color: #e05638 !important;
+  border-color: #e05638 !important;
+}
+
 /* Global scrollbar styling to make it subtle across all browsers */
 ::-webkit-scrollbar {
   width: 6px;
