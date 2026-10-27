@@ -12,11 +12,6 @@
   --scrollbar-thumb-hover: rgba(255, 255, 255, 0.2);
 }
 
-.theme-navy {
-  --color-header-bg: #000000;
-  --color-overlay-bg: #000000;
-}
-
 /* Light Theme Overrides (Solid Series Standard Slate-Gray & Clean Ice Palette) */
 .theme-light {
   --color-slate-950: #f8fafc; /* メイン背景：清潔感のある白に近いオフホワイト */
@@ -158,37 +153,101 @@
   color: #fdf5eb !important;
 }
 
-/* プルダウンメニュー内の文字色がヘッダーの上書きで白飛びするのを完全に防止 */
+/* === テーマ切り替えプルダウンメニュー (全テーマ共通・高コントラスト インダストリアルスタイル) === */
 .theme-dropdown-menu,
-.theme-mocha .theme-dropdown-menu,
-.theme-latte .theme-dropdown-menu,
-.theme-light .theme-dropdown-menu {
-  background-color: #14161a !important;
-  border-color: #334155 !important;
+[class*="theme-"] .theme-dropdown-menu {
+  background-color: #11141a !important;
+  border: 1px solid #2d3748 !important;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(255, 255, 255, 0.08) !important;
 }
 
-.theme-dropdown-menu span,
-.theme-mocha .theme-dropdown-menu span,
-.theme-latte .theme-dropdown-menu span {
+.theme-dropdown-header,
+[class*="theme-"] .theme-dropdown-header {
+  background-color: #0b0e13 !important;
+  border-bottom: 1px solid #1f2733 !important;
+  color: #94a3b8 !important;
+}
+
+.theme-dropdown-header span,
+[class*="theme-"] .theme-dropdown-header span {
+  color: #94a3b8 !important;
+}
+
+/* 通常時アイテム */
+.theme-dropdown-item,
+[class*="theme-"] .theme-dropdown-item {
+  background-color: transparent !important;
+  border-left: 3px solid transparent !important;
+  transition: all 0.12s ease !important;
+}
+
+.theme-dropdown-item span,
+[class*="theme-"] .theme-dropdown-item span,
+.theme-dropdown-item .theme-dropdown-label,
+[class*="theme-"] .theme-dropdown-item .theme-dropdown-label {
   color: #cbd5e1 !important;
 }
 
-.theme-dropdown-menu .active-theme-item span {
-  color: #22d3ee !important;
+.theme-dropdown-item .theme-dropdown-dot,
+[class*="theme-"] .theme-dropdown-item .theme-dropdown-dot {
+  border: 1px solid rgba(255, 255, 255, 0.3) !important;
+  box-shadow: 0 0 3px rgba(0, 0, 0, 0.6) !important;
 }
 
-.theme-mocha .theme-dropdown-menu .active-theme-item span,
-.theme-mocha .theme-dropdown-menu .active-theme-item svg {
-  color: #dcbfa9 !important;
+/* ホバー時: 背景を濃色ダークスレート(#222b3b)にし、文字を純白(#ffffff)にハッキリ強調、左側にブルーのアクセントライン */
+.theme-dropdown-item:hover,
+[class*="theme-"] .theme-dropdown-item:hover {
+  background-color: #222b3b !important;
+  border-left-color: #60a5fa !important;
 }
 
-.theme-latte .theme-dropdown-menu .active-theme-item span,
-.theme-latte .theme-dropdown-menu .active-theme-item svg {
-  color: #b5a086 !important;
+.theme-dropdown-item:hover span,
+[class*="theme-"] .theme-dropdown-item:hover span,
+.theme-dropdown-item:hover .theme-dropdown-label,
+[class*="theme-"] .theme-dropdown-item:hover .theme-dropdown-label {
+  color: #ffffff !important;
 }
 
-.theme-light .theme-dropdown-menu .active-theme-item span,
-.theme-light .theme-dropdown-menu .active-theme-item svg {
+/* 選択中（アクティブ）のテーマ項目 */
+.theme-dropdown-item.active-theme-item,
+[class*="theme-"] .theme-dropdown-item.active-theme-item {
+  background-color: #172235 !important;
+  border-left-color: #38bdf8 !important;
+}
+
+.theme-dropdown-item.active-theme-item span,
+[class*="theme-"] .theme-dropdown-item.active-theme-item span,
+.theme-dropdown-item.active-theme-item .theme-dropdown-label,
+[class*="theme-"] .theme-dropdown-item.active-theme-item .theme-dropdown-label {
+  color: #38bdf8 !important;
+  font-weight: 800 !important;
+}
+
+.theme-dropdown-item.active-theme-item svg,
+[class*="theme-"] .theme-dropdown-item.active-theme-item svg,
+.theme-dropdown-item.active-theme-item .theme-dropdown-check,
+[class*="theme-"] .theme-dropdown-item.active-theme-item .theme-dropdown-check {
+  color: #38bdf8 !important;
+}
+
+/* 選択中項目にホバーした時 */
+.theme-dropdown-item.active-theme-item:hover,
+[class*="theme-"] .theme-dropdown-item.active-theme-item:hover {
+  background-color: #1e2c44 !important;
+  border-left-color: #38bdf8 !important;
+}
+
+.theme-dropdown-item.active-theme-item:hover span,
+[class*="theme-"] .theme-dropdown-item.active-theme-item:hover span,
+.theme-dropdown-item.active-theme-item:hover .theme-dropdown-label,
+[class*="theme-"] .theme-dropdown-item.active-theme-item:hover .theme-dropdown-label {
+  color: #ffffff !important;
+}
+
+.theme-dropdown-item.active-theme-item:hover svg,
+[class*="theme-"] .theme-dropdown-item.active-theme-item:hover svg,
+.theme-dropdown-item.active-theme-item:hover .theme-dropdown-check,
+[class*="theme-"] .theme-dropdown-item.active-theme-item:hover .theme-dropdown-check {
   color: #38bdf8 !important;
 }
 
@@ -381,10 +440,6 @@
   border-color: #38242a !important;
 }
 
-.theme-pink .theme-dropdown-menu .active-theme-item span,
-.theme-pink .theme-dropdown-menu .active-theme-item svg {
-  color: #b5707e !important;
-}
 
 .theme-pink .custom-checkbox:checked {
   background-color: #8C4D58 !important;
@@ -490,10 +545,6 @@
   border-color: #331c20 !important;
 }
 
-.theme-red .theme-dropdown-menu .active-theme-item span,
-.theme-red .theme-dropdown-menu .active-theme-item svg {
-  color: #be3e3e !important;
-}
 
 .theme-red .custom-checkbox:checked {
   background-color: #9e2a2a !important;
@@ -605,10 +656,6 @@
   border-color: #94a3b8 !important;
 }
 
-.theme-paper .theme-dropdown-menu .active-theme-item span,
-.theme-paper .theme-dropdown-menu .active-theme-item svg {
-  color: #e05638 !important;
-}
 
 .theme-paper .custom-checkbox:checked {
   background-color: #e05638 !important;

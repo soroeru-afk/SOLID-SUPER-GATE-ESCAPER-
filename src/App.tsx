@@ -2766,8 +2766,8 @@ export default function App() {
 
                   {/* プルダウンメニューポップアップ */}
                   {isThemeMenuOpen && (
-                    <div className="theme-dropdown-menu absolute top-full right-0 mt-1.5 z-[999] w-48 bg-slate-900 border border-slate-700/90 rounded-lg shadow-2xl backdrop-blur-md overflow-hidden flex flex-col py-1 animate-in fade-in duration-100">
-                      <div className="px-3 py-1.5 border-b border-slate-800/80 text-[10px] font-bold text-slate-300 flex items-center gap-1.5 bg-slate-950/60">
+                    <div className="theme-dropdown-menu absolute top-full right-0 mt-1.5 z-[999] w-48 rounded-lg shadow-2xl backdrop-blur-md overflow-hidden flex flex-col py-1 animate-in fade-in duration-100">
+                      <div className="theme-dropdown-header px-3 py-1.5 text-[10px] font-bold flex items-center gap-1.5">
                         <span>🎨</span>
                         <span>テーマ切り替え</span>
                       </div>
@@ -2783,18 +2783,16 @@ export default function App() {
                                 saveSettings({ ...settings, theme: tOpt.id });
                                 setIsThemeMenuOpen(false);
                               }}
-                              className={`w-full flex items-center justify-between px-3 py-2 text-xs font-mono font-bold transition-colors cursor-pointer ${
-                                isCurrent
-                                  ? 'active-theme-item bg-cyan-500/20 text-cyan-400'
-                                  : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                              className={`theme-dropdown-item w-full flex items-center justify-between px-3 py-2 text-xs font-mono font-bold transition-all cursor-pointer ${
+                                isCurrent ? 'active-theme-item' : ''
                               }`}
                             >
                               <div className="flex items-center gap-2.5">
-                                <span className="w-2.5 h-2.5 rounded-full shrink-0 shadow-xs" style={{ backgroundColor: tOpt.color }} />
-                                <span className="uppercase tracking-wider">{tOpt.label}</span>
+                                <span className="theme-dropdown-dot w-2.5 h-2.5 rounded-full shrink-0 shadow-xs" style={{ backgroundColor: tOpt.color }} />
+                                <span className="theme-dropdown-label uppercase tracking-wider">{tOpt.label}</span>
                               </div>
                               {isCurrent && (
-                                <Check size={14} className="text-cyan-400 shrink-0" />
+                                <Check size={14} className="theme-dropdown-check shrink-0" />
                               )}
                             </button>
                           );
