@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Settings, Folder, FolderOpen, Folders, File as FileIcon, X, Search, Plus, Minus, RotateCw, Trash2, Edit2, Upload, Download, Map as MapIcon, ChevronRight, ChevronLeft, ChevronsRight, ChevronsLeft, ChevronUp, ChevronDown, Menu, Check, Copy, PanelLeftClose, PanelRightClose, PanelLeftOpen, PanelRightOpen, PanelLeft, PanelRight, Maximize, Minimize, Palette, Eye, EyeOff, ExternalLink, LayoutList, GripVertical, ArrowUp, ArrowDown, Layers, Compass } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { LinkManagerView, openInCenteredWindow, getDirectStreetViewUrl } from './components/LinkManagerView';
+import { PWAInstallButton } from './components/PWAInstallButton';
 
 // === Types ===
 interface LocationItem {
@@ -326,8 +327,36 @@ export default function App() {
   const [folderState, setFolderState] = useState<Record<string, boolean>>({});
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [tabs, setTabs] = useState<TabData[]>([]);
-  const [activeTabId, setActiveTabId] = useState<string | null>(null);
+  const [tabs, setTabs] = useState<TabData[]>(() => {
+    try {
+      const savedTabs = localStorage.getItem('sv_tabs');
+      if (savedTabs) {
+        const parsedTabs = JSON.parse(savedTabs);
+        if (Array.isArray(parsedTabs) && parsedTabs.length > 0) {
+          return parsedTabs;
+        }
+      }
+    } catch {}
+    const defaultTabId = crypto.randomUUID();
+    return [{ id: defaultTabId, location: null }];
+  });
+
+  const [activeTabId, setActiveTabId] = useState<string | null>(() => {
+    try {
+      const savedActiveTab = localStorage.getItem('sv_active_tab_id');
+      const savedTabs = localStorage.getItem('sv_tabs');
+      if (savedTabs) {
+        const parsedTabs = JSON.parse(savedTabs);
+        if (Array.isArray(parsedTabs) && parsedTabs.length > 0) {
+          if (savedActiveTab && parsedTabs.some((t: TabData) => t.id === savedActiveTab)) {
+            return savedActiveTab;
+          }
+          return parsedTabs[0].id;
+        }
+      }
+    } catch {}
+    return null;
+  });
   const [bulkTargetFolder, setBulkTargetFolder] = useState('');
   const [isSelectMode, setIsSelectMode] = useState(false);
   const [sortOrder, setSortOrder] = useState<'custom' | 'asc' | 'desc'>('custom');
@@ -636,9 +665,12 @@ export default function App() {
   const [isResizingSidebar, setIsResizingSidebar] = useState(false);
 
   // メイン画面の表示モード ('viewer': ストリートビュー, 'manager': リンクマネージャー/リスト編集)
-  // データが存在する場合は初期状態でリスト管理モード (ALL DATA) を表示
+  // 直前に保存されていた表示モードを復元
   const [mainViewMode, setMainViewMode] = useState<'viewer' | 'manager'>(() => {
     try {
+      const savedMode = localStorage.getItem('sv_main_view_mode');
+      if (savedMode === 'viewer' || savedMode === 'manager') return savedMode;
+
       const cache = localStorage.getItem('sv_locations_cache');
       if (cache) {
         const parsed = JSON.parse(cache);
@@ -647,7 +679,18 @@ export default function App() {
     } catch {}
     return 'viewer';
   });
-  const [managerFolder, setManagerFolder] = useState<string | null>(null);
+
+  // リスト管理画面で選択中のフォルダ (null = [ ALL DATA ], 文字列 = フォルダ名)
+  // 直前に選択していたフォルダを復元
+  const [managerFolder, setManagerFolder] = useState<string | null>(() => {
+    try {
+      const savedFolder = localStorage.getItem('sv_manager_folder');
+      if (savedFolder !== null && savedFolder !== undefined && savedFolder !== 'null' && savedFolder !== 'undefined') {
+        return savedFolder;
+      }
+    } catch {}
+    return null;
+  });
   const [managerNavToken, setManagerNavToken] = useState<number>(() => Date.now());
   const [managerSearch, setManagerSearch] = useState('');
   const [draggedManagerId, setDraggedManagerId] = useState<string | null>(null);
@@ -1004,26 +1047,6 @@ export default function App() {
         setSettings({ ...DEFAULT_SETTINGS, ...parsed });
       }
 
-      const savedTabs = localStorage.getItem('sv_tabs');
-      const savedActiveTab = localStorage.getItem('sv_active_tab_id');
-      
-      let initialTabsLoaded = false;
-      if (savedTabs) {
-        const parsedTabs = JSON.parse(savedTabs);
-        if (Array.isArray(parsedTabs) && parsedTabs.length > 0) {
-          setTabs(parsedTabs);
-          initialTabsLoaded = true;
-        }
-      }
-      
-      if (!initialTabsLoaded) {
-        const initialTabId = crypto.randomUUID();
-        setTabs([{ id: initialTabId, location: null }]);
-        setActiveTabId(initialTabId);
-      } else if (savedActiveTab) {
-        setActiveTabId(savedActiveTab);
-      }
-
       // URLパラメータで特定の場所が指定されている場合は直接ビューアで表示
       if (targetId || targetUrlParam || modeParam === 'viewer') {
         setMainViewMode('viewer');
@@ -1043,9 +1066,25 @@ export default function App() {
           };
           handleItemClick(tempItem);
         }
-      } else if (parsedLocations.length > 0) {
-        setMainViewMode('manager');
-        setManagerFolder(null);
+      } else {
+        // URLパラメータが無い場合は、直前に復元された managerFolder 及び mainViewMode を維持
+        const savedFolder = localStorage.getItem('sv_manager_folder');
+        if (savedFolder && savedFolder !== 'null' && savedFolder !== 'undefined') {
+          // 実際に該当フォルダが存在するか検証し、存在すればそのフォルダをセット
+          const folderExists = parsedLocations.some(l => l.folderName === savedFolder || l.folderName.startsWith(savedFolder + ' / '));
+          if (folderExists) {
+            setManagerFolder(savedFolder);
+          } else {
+            setManagerFolder(null);
+          }
+        }
+
+        const savedMode = localStorage.getItem('sv_main_view_mode') as 'viewer' | 'manager' | null;
+        if (savedMode === 'viewer' || savedMode === 'manager') {
+          setMainViewMode(savedMode);
+        } else if (parsedLocations.length > 0) {
+          setMainViewMode('manager');
+        }
       }
     } catch (e) {} finally {
       isLoaded.current = true;
@@ -1054,13 +1093,54 @@ export default function App() {
 
   useEffect(() => {
     if (!isLoaded.current) return;
-    localStorage.setItem('sv_tabs', JSON.stringify(tabs));
-    if (activeTabId) {
-      localStorage.setItem('sv_active_tab_id', activeTabId);
-    } else {
-      localStorage.removeItem('sv_active_tab_id');
-    }
+    try {
+      if (tabs.length > 0) {
+        localStorage.setItem('sv_tabs', JSON.stringify(tabs));
+      }
+      if (activeTabId) {
+        localStorage.setItem('sv_active_tab_id', activeTabId);
+      } else {
+        localStorage.removeItem('sv_active_tab_id');
+      }
+    } catch (e) {}
   }, [tabs, activeTabId]);
+
+  // 別窓・マルチウィンドウ間でのタブ同期（リアルタイム同調）
+  useEffect(() => {
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'sv_tabs' && e.newValue) {
+        try {
+          const parsed = JSON.parse(e.newValue);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setTabs(parsed);
+          }
+        } catch {}
+      }
+      if (e.key === 'sv_active_tab_id' && e.newValue) {
+        setActiveTabId(e.newValue);
+      }
+    };
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, []);
+
+  useEffect(() => {
+    if (!isLoaded.current) return;
+    try {
+      localStorage.setItem('sv_main_view_mode', mainViewMode);
+    } catch (e) {}
+  }, [mainViewMode]);
+
+  useEffect(() => {
+    if (!isLoaded.current) return;
+    try {
+      if (managerFolder !== null && managerFolder !== undefined) {
+        localStorage.setItem('sv_manager_folder', managerFolder);
+      } else {
+        localStorage.removeItem('sv_manager_folder');
+      }
+    } catch (e) {}
+  }, [managerFolder]);
 
   useEffect(() => {
     if (!isLoaded.current) return;
@@ -1069,6 +1149,20 @@ export default function App() {
     } catch(e) {}
   }, [locations]);
 
+  // Save changes
+  const saveLocations = (newLocs: LocationItem[]) => {
+    setLocations(newLocs);
+    try {
+      localStorage.setItem('sv_locations_cache', JSON.stringify(newLocs));
+    } catch(e) {}
+  };
+
+  const saveSettings = (newSettings: AppSettings) => {
+    setSettings(newSettings);
+    try {
+      localStorage.setItem('sv_settings', JSON.stringify(newSettings));
+    } catch(e) {}
+  };
 
   // Dynamic theme-color meta tag sync (Solid series standard: synchronized to Sidebar Header background)
   useEffect(() => {
@@ -1092,21 +1186,6 @@ export default function App() {
     }
     metaTag.setAttribute('content', currentColor);
   }, [settings.theme]);
-
-  // Save changes
-  const saveLocations = (newLocs: LocationItem[]) => {
-    setLocations(newLocs);
-    try {
-      localStorage.setItem('sv_locations_cache', JSON.stringify(newLocs));
-    } catch(e) {}
-  };
-
-  const saveSettings = (newSettings: AppSettings) => {
-    setSettings(newSettings);
-    try {
-      localStorage.setItem('sv_settings', JSON.stringify(newSettings));
-    } catch(e) {}
-  };
 
   // Sync Tampermonkey
   useEffect(() => {
@@ -1677,6 +1756,8 @@ export default function App() {
       localStorage.removeItem('sv_locations_sync');
       localStorage.removeItem('sv_tabs');
       localStorage.removeItem('sv_active_tab_id');
+      localStorage.removeItem('sv_manager_folder');
+      localStorage.removeItem('sv_main_view_mode');
       localStorage.removeItem('knav_parent_folder_order');
       localStorage.removeItem('knav_sub_folder_order');
     }
@@ -1933,6 +2014,9 @@ export default function App() {
                   {isImmersive ? <EyeOff size={11} className="shrink-0" /> : <Eye size={11} className="shrink-0" />}
                   <span>UI</span>
                 </button>
+
+                {/* PWA インストールボタン */}
+                <PWAInstallButton className="h-[20px] text-[9px] py-0 px-2" />
 
                 {/* 言語切替トグル */}
                 <div className="h-[20px] flex items-center border border-slate-700 rounded-sm overflow-hidden text-[9px] font-bold lang-toggle-container">
