@@ -1069,6 +1069,7 @@ export default function App() {
     } catch(e) {}
   }, [locations]);
 
+
   // Dynamic theme-color meta tag sync (Solid series standard: synchronized to Sidebar Header background)
   useEffect(() => {
     const themeHeaderColors: Record<string, string> = {
@@ -1080,7 +1081,7 @@ export default function App() {
       pink: '#26151a',
       rose: '#26151a',
       red: '#241113',
-      paper: '#ffffff',
+      paper: '#EBE4D5',
     };
     const currentColor = themeHeaderColors[settings.theme || 'navy'] || '#000000';
     let metaTag = document.querySelector('meta[name="theme-color"]');
@@ -1902,8 +1903,9 @@ export default function App() {
             borderRightWidth: isSidebarOpen && settings.sidebarPosition === 'left' ? '1px' : '0',
             borderLeftWidth: isSidebarOpen && settings.sidebarPosition === 'right' ? '1px' : '0',
             pointerEvents: isSidebarOpen ? 'auto' : 'none',
-            overflow: 'hidden'
-          }}
+            overflow: 'hidden',
+            '--sidebar-opacity': mainViewMode === 'manager' ? 1 : (settings.sidebarOpacity ?? 1),
+          } as React.CSSProperties}
         >
           <div 
             style={{ width: `${settings.sidebarWidth}px` }} 
@@ -1951,7 +1953,10 @@ export default function App() {
             </div>
 
             {/* 下部リストエリア（ヘッダー下のみに透明度レイヤーを適用） */}
-            <div className="flex flex-col flex-1 min-h-0 relative z-10 bg-transparent">
+            <div 
+              className="flex flex-col flex-1 min-h-0 relative z-10 bg-transparent"
+              style={{ '--sidebar-opacity': mainViewMode === 'manager' ? 1 : (settings.sidebarOpacity ?? 1) } as React.CSSProperties}
+            >
               {/* リストエリアの背景レイヤー（リスト管理モードでは自動で1.0、ビューアーモードでは設定した透明度） */}
               <div 
                 className="absolute inset-0 bg-slate-950 backdrop-blur-md -z-10 pointer-events-none transition-opacity duration-150"
@@ -2361,7 +2366,7 @@ export default function App() {
                                 </div>
 
                                 {isSubOpen && (
-                                  <div className="mt-1 flex flex-col gap-0.5 pl-4 pr-1 border-l border-slate-800/60 ml-2">
+                                  <div className="sidebar-opened-items mt-1 flex flex-col gap-0.5 pl-4 pr-1 border-l border-slate-800/60 ml-2">
                                     {sub.items.map(item => {
                                       const isActive = currentItem?.id === item.id;
                                       const isChecked = selectedIds.has(item.id);
@@ -2369,7 +2374,7 @@ export default function App() {
                                         <div 
                                           key={item.id} 
                                           className={`
-                                            flex items-center py-1.5 px-2 rounded-sm cursor-pointer border-l-2 transition-colors group/item relative
+                                            sidebar-location-item flex items-center py-1.5 px-2 rounded-sm cursor-pointer border-l-2 transition-colors group/item relative
                                             ${isActive ? 'bg-cyan-500/20 border-cyan-500 text-white font-bold' : 'border-transparent text-slate-200 hover:bg-slate-800/60 hover:text-white'}
                                           `}
                                           onClick={(e) => handleSidebarItemClick(item, e)}
@@ -2441,18 +2446,20 @@ export default function App() {
                           })}
 
                           {/* 親フォルダ直下のアイテム */}
-                          {parent.directItems.map(item => {
-                            const isActive = currentItem?.id === item.id;
-                            const isChecked = selectedIds.has(item.id);
-                            return (
-                              <div 
-                                key={item.id} 
-                                className={`
-                                  flex items-center py-1.5 px-2 rounded-sm cursor-pointer border-l-2 transition-colors group/item relative
-                                  ${isActive ? 'bg-cyan-500/20 border-cyan-500 text-white font-bold' : 'border-transparent text-slate-200 hover:bg-slate-800/60 hover:text-white'}
-                                `}
-                                onClick={(e) => handleSidebarItemClick(item, e)}
-                              >
+                          {parent.directItems.length > 0 && (
+                            <div className="sidebar-opened-items mt-1 flex flex-col gap-0.5 pl-4 pr-1 border-l border-slate-800/60 ml-2">
+                              {parent.directItems.map(item => {
+                                const isActive = currentItem?.id === item.id;
+                                const isChecked = selectedIds.has(item.id);
+                                return (
+                                  <div 
+                                    key={item.id} 
+                                    className={`
+                                      sidebar-location-item flex items-center py-1.5 px-2 rounded-sm cursor-pointer border-l-2 transition-colors group/item relative
+                                      ${isActive ? 'bg-cyan-500/20 border-cyan-500 text-white font-bold' : 'border-transparent text-slate-200 hover:bg-slate-800/60 hover:text-white'}
+                                    `}
+                                    onClick={(e) => handleSidebarItemClick(item, e)}
+                                  >
                                 {isSelectMode && (
                                   <div className="mr-3 flex items-center justify-center shrink-0">
                                     <input 
@@ -2511,8 +2518,10 @@ export default function App() {
                                   </button>
                                 </div>
                               </div>
-                            );
-                          })}
+                              );
+                            })}
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>
@@ -2837,7 +2846,7 @@ export default function App() {
                 <div className="flex items-center gap-1 border-l border-white/20 pl-2 ml-1 shrink-0">
                   <button 
                     onClick={() => saveSettings({ ...settings, sidebarPosition: settings.sidebarPosition === 'left' ? 'right' : 'left' })}
-                    className="p-1.5 text-white/90 hover:bg-white/20 hover:text-cyan-400 rounded-md transition-colors border border-white/20 hover:border-white/40"
+                    className="header-action-btn p-1.5 text-white/90 hover:bg-white/20 hover:text-cyan-400 rounded-md transition-colors border border-white/20 hover:border-white/40"
                     title={`サイドバー位置切替 (現在: ${settings.sidebarPosition === 'left' ? '左' : '右'} / クリックで${settings.sidebarPosition === 'left' ? '右' : '左'}側へ移動)`}
                   >
                     {settings.sidebarPosition === 'left' ? <PanelLeft size={15} /> : <PanelRight size={15} />}
@@ -2845,7 +2854,7 @@ export default function App() {
 
                   <button 
                     onClick={toggleFullscreen}
-                    className="p-1.5 text-white/90 hover:bg-white/20 hover:text-white rounded-md transition-colors border border-white/20 hover:border-white/40"
+                    className="header-action-btn p-1.5 text-white/90 hover:bg-white/20 hover:text-white rounded-md transition-colors border border-white/20 hover:border-white/40"
                     title={isFullscreen ? t('exitFullscreen') : t('fullscreen')}
                   >
                     {isFullscreen ? <Minimize size={15} /> : <Maximize size={15} />}
@@ -2855,7 +2864,7 @@ export default function App() {
                     href={window.location.href}
                     target="_blank"
                     rel="noreferrer"
-                    className="p-1.5 text-white/90 hover:bg-white/20 hover:text-cyan-400 rounded-md transition-colors border border-white/20 hover:border-white/40 inline-flex items-center justify-center shrink-0"
+                    className="header-action-btn p-1.5 text-white/90 hover:bg-white/20 hover:text-cyan-400 rounded-md transition-colors border border-white/20 hover:border-white/40 inline-flex items-center justify-center shrink-0"
                     title="別タブで開く (新しいウィンドウで開く)"
                   >
                     <ExternalLink size={15} />
@@ -2863,7 +2872,7 @@ export default function App() {
 
                   <button 
                     onClick={() => setIsSettingsOpen(true)}
-                    className="p-1.5 text-white/90 hover:bg-white/20 hover:text-cyan-400 rounded-md transition-colors border border-white/20 hover:border-white/40 shrink-0"
+                    className="header-action-btn p-1.5 text-white/90 hover:bg-white/20 hover:text-cyan-400 rounded-md transition-colors border border-white/20 hover:border-white/40 shrink-0"
                     title="設定"
                   >
                     <Settings size={15} />
@@ -2921,12 +2930,12 @@ export default function App() {
                       setActiveTabId(tab.id);
                       setMainViewMode('viewer');
                     }}
-                    className={`flex items-center gap-2 px-3 py-1.5 border text-[10px] uppercase font-mono font-bold whitespace-nowrap transition-all cursor-grab active:cursor-grabbing select-none
+                    className={`tab-btn-item flex items-center gap-2 px-3 py-1.5 border text-[10px] uppercase font-mono font-bold whitespace-nowrap transition-all cursor-grab active:cursor-grabbing select-none
                       ${draggedTabIndex === idx ? 'opacity-30 scale-95 border-dashed border-cyan-400' : ''}
                       ${dragOverTabIndex === idx && draggedTabIndex !== idx ? 'border-cyan-400 bg-cyan-950/50 shadow-[inset_0_0_8px_rgba(6,182,212,0.4)] ring-1 ring-cyan-400' : ''}
                       ${activeTabId === tab.id 
-                        ? 'bg-slate-800 border-slate-600 text-white shadow-sm' 
-                        : 'bg-transparent border-slate-700 border-dashed text-slate-500 hover:bg-slate-800/50 hover:text-slate-300 hover:border-slate-600'
+                        ? 'tab-btn-active bg-slate-800 border-slate-600 text-white shadow-sm' 
+                        : 'tab-btn-inactive bg-transparent border-slate-700 border-dashed text-slate-500 hover:bg-slate-800/50 hover:text-slate-300 hover:border-slate-600'
                       }`}
                     title="クリックで選択 / ドラッグで並べ替え"
                   >
@@ -3380,36 +3389,54 @@ export default function App() {
                   <label className="text-[11px] font-bold text-slate-400 uppercase tracking-widest block mb-2">
                     {t('theme')}
                   </label>
-                  <div className="flex flex-wrap bg-slate-800 rounded-md p-1 border border-slate-700">
+                  <div className="flex flex-wrap bg-slate-800 rounded-md p-1 border border-slate-700 gap-1">
                     <button 
-                      className={`flex-1 min-w-[30%] flex justify-center items-center py-1.5 text-xs font-bold rounded-sm transition-colors ${(!settings.theme || settings.theme === 'navy') ? 'bg-cyan-600 text-black' : 'text-slate-400 hover:text-slate-200'}`}
+                      className={`flex-1 min-w-[22%] flex justify-center items-center py-1.5 text-xs font-bold rounded-sm transition-colors ${(!settings.theme || settings.theme === 'navy') ? 'bg-cyan-600 text-black' : 'text-slate-400 hover:text-slate-200'}`}
                       onClick={() => saveSettings({ ...settings, theme: 'navy' })}
                     >
                       {t('navy')}
                     </button>
                     <button 
-                      className={`flex-1 min-w-[30%] flex justify-center items-center py-1.5 text-xs font-bold rounded-sm transition-colors ${settings.theme === 'dark' ? 'bg-cyan-600 text-black' : 'text-slate-400 hover:text-slate-200'}`}
+                      className={`flex-1 min-w-[22%] flex justify-center items-center py-1.5 text-xs font-bold rounded-sm transition-colors ${settings.theme === 'dark' ? 'bg-cyan-600 text-black' : 'text-slate-400 hover:text-slate-200'}`}
                       onClick={() => saveSettings({ ...settings, theme: 'dark' })}
                     >
                       {t('dark')}
                     </button>
                     <button 
-                      className={`flex-1 min-w-[30%] flex justify-center items-center py-1.5 text-xs font-bold rounded-sm transition-colors ${settings.theme === 'light' ? 'bg-cyan-600 text-black' : 'text-slate-400 hover:text-slate-200'}`}
+                      className={`flex-1 min-w-[22%] flex justify-center items-center py-1.5 text-xs font-bold rounded-sm transition-colors ${settings.theme === 'light' ? 'bg-cyan-600 text-black' : 'text-slate-400 hover:text-slate-200'}`}
                       onClick={() => saveSettings({ ...settings, theme: 'light' })}
                     >
                       {t('light')}
                     </button>
                     <button 
-                      className={`flex-1 min-w-[45%] flex justify-center items-center py-1.5 text-xs font-bold rounded-sm transition-colors ${settings.theme === 'mocha' ? 'bg-cyan-600 text-black' : 'text-slate-400 hover:text-slate-200'}`}
+                      className={`flex-1 min-w-[22%] flex justify-center items-center py-1.5 text-xs font-bold rounded-sm transition-colors ${settings.theme === 'paper' ? 'bg-cyan-600 text-black' : 'text-slate-400 hover:text-slate-200'}`}
+                      onClick={() => saveSettings({ ...settings, theme: 'paper' })}
+                    >
+                      {t('paper')}
+                    </button>
+                    <button 
+                      className={`flex-1 min-w-[30%] flex justify-center items-center py-1.5 text-xs font-bold rounded-sm transition-colors ${settings.theme === 'mocha' ? 'bg-cyan-600 text-black' : 'text-slate-400 hover:text-slate-200'}`}
                       onClick={() => saveSettings({ ...settings, theme: 'mocha' })}
                     >
                       {t('mocha')}
                     </button>
                     <button 
-                      className={`flex-1 min-w-[45%] flex justify-center items-center py-1.5 text-xs font-bold rounded-sm transition-colors ${settings.theme === 'latte' ? 'bg-cyan-600 text-black' : 'text-slate-400 hover:text-slate-200'}`}
+                      className={`flex-1 min-w-[30%] flex justify-center items-center py-1.5 text-xs font-bold rounded-sm transition-colors ${settings.theme === 'latte' ? 'bg-cyan-600 text-black' : 'text-slate-400 hover:text-slate-200'}`}
                       onClick={() => saveSettings({ ...settings, theme: 'latte' })}
                     >
                       {t('latte')}
+                    </button>
+                    <button 
+                      className={`flex-1 min-w-[30%] flex justify-center items-center py-1.5 text-xs font-bold rounded-sm transition-colors ${settings.theme === 'pink' ? 'bg-cyan-600 text-black' : 'text-slate-400 hover:text-slate-200'}`}
+                      onClick={() => saveSettings({ ...settings, theme: 'pink' })}
+                    >
+                      {t('pink')}
+                    </button>
+                    <button 
+                      className={`flex-1 min-w-[30%] flex justify-center items-center py-1.5 text-xs font-bold rounded-sm transition-colors ${settings.theme === 'red' ? 'bg-cyan-600 text-black' : 'text-slate-400 hover:text-slate-200'}`}
+                      onClick={() => saveSettings({ ...settings, theme: 'red' })}
+                    >
+                      {t('red')}
                     </button>
                   </div>
                 </div>

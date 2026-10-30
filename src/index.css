@@ -12,6 +12,12 @@
   --scrollbar-thumb-hover: rgba(255, 255, 255, 0.2);
 }
 
+
+.theme-navy {
+  --color-header-bg: #000000;
+  --color-overlay-bg: #000000;
+}
+
 /* Light Theme Overrides (Solid Series Standard Slate-Gray & Clean Ice Palette) */
 .theme-light {
   --color-slate-950: #f8fafc; /* メイン背景：清潔感のある白に近いオフホワイト */
@@ -153,102 +159,359 @@
   color: #fdf5eb !important;
 }
 
-/* === テーマ切り替えプルダウンメニュー (全テーマ共通・高コントラスト インダストリアルスタイル) === */
-.theme-dropdown-menu,
-[class*="theme-"] .theme-dropdown-menu {
+/* === テーマ切り替えプルダウンメニュー (デフォルト/ネイビー: 高コントラスト インダストリアルスタイル) === */
+.theme-dropdown-menu {
   background-color: #11141a !important;
   border: 1px solid #2d3748 !important;
   box-shadow: 0 12px 30px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(255, 255, 255, 0.08) !important;
 }
 
-.theme-dropdown-header,
-[class*="theme-"] .theme-dropdown-header {
+.theme-dropdown-header {
   background-color: #0b0e13 !important;
   border-bottom: 1px solid #1f2733 !important;
   color: #94a3b8 !important;
 }
 
-.theme-dropdown-header span,
-[class*="theme-"] .theme-dropdown-header span {
+.theme-dropdown-header span {
   color: #94a3b8 !important;
 }
 
 /* 通常時アイテム */
-.theme-dropdown-item,
-[class*="theme-"] .theme-dropdown-item {
+.theme-dropdown-item {
   background-color: transparent !important;
   border-left: 3px solid transparent !important;
   transition: all 0.12s ease !important;
 }
 
 .theme-dropdown-item span,
-[class*="theme-"] .theme-dropdown-item span,
-.theme-dropdown-item .theme-dropdown-label,
-[class*="theme-"] .theme-dropdown-item .theme-dropdown-label {
+.theme-dropdown-item .theme-dropdown-label {
   color: #cbd5e1 !important;
 }
 
-.theme-dropdown-item .theme-dropdown-dot,
-[class*="theme-"] .theme-dropdown-item .theme-dropdown-dot {
+.theme-dropdown-item .theme-dropdown-dot {
   border: 1px solid rgba(255, 255, 255, 0.3) !important;
   box-shadow: 0 0 3px rgba(0, 0, 0, 0.6) !important;
 }
 
-/* ホバー時: 背景を濃色ダークスレート(#222b3b)にし、文字を純白(#ffffff)にハッキリ強調、左側にブルーのアクセントライン */
-.theme-dropdown-item:hover,
-[class*="theme-"] .theme-dropdown-item:hover {
+/* ホバー時 */
+.theme-dropdown-item:hover {
   background-color: #222b3b !important;
   border-left-color: #60a5fa !important;
 }
 
 .theme-dropdown-item:hover span,
-[class*="theme-"] .theme-dropdown-item:hover span,
-.theme-dropdown-item:hover .theme-dropdown-label,
-[class*="theme-"] .theme-dropdown-item:hover .theme-dropdown-label {
+.theme-dropdown-item:hover .theme-dropdown-label {
   color: #ffffff !important;
 }
 
 /* 選択中（アクティブ）のテーマ項目 */
-.theme-dropdown-item.active-theme-item,
-[class*="theme-"] .theme-dropdown-item.active-theme-item {
+.theme-dropdown-item.active-theme-item {
   background-color: #172235 !important;
   border-left-color: #38bdf8 !important;
 }
 
 .theme-dropdown-item.active-theme-item span,
-[class*="theme-"] .theme-dropdown-item.active-theme-item span,
-.theme-dropdown-item.active-theme-item .theme-dropdown-label,
-[class*="theme-"] .theme-dropdown-item.active-theme-item .theme-dropdown-label {
+.theme-dropdown-item.active-theme-item .theme-dropdown-label {
   color: #38bdf8 !important;
   font-weight: 800 !important;
 }
 
 .theme-dropdown-item.active-theme-item svg,
-[class*="theme-"] .theme-dropdown-item.active-theme-item svg,
-.theme-dropdown-item.active-theme-item .theme-dropdown-check,
-[class*="theme-"] .theme-dropdown-item.active-theme-item .theme-dropdown-check {
+.theme-dropdown-item.active-theme-item .theme-dropdown-check {
   color: #38bdf8 !important;
 }
 
-/* 選択中項目にホバーした時 */
-.theme-dropdown-item.active-theme-item:hover,
-[class*="theme-"] .theme-dropdown-item.active-theme-item:hover {
+.theme-dropdown-item.active-theme-item:hover {
   background-color: #1e2c44 !important;
   border-left-color: #38bdf8 !important;
 }
 
 .theme-dropdown-item.active-theme-item:hover span,
-[class*="theme-"] .theme-dropdown-item.active-theme-item:hover span,
-.theme-dropdown-item.active-theme-item:hover .theme-dropdown-label,
-[class*="theme-"] .theme-dropdown-item.active-theme-item:hover .theme-dropdown-label {
+.theme-dropdown-item.active-theme-item:hover .theme-dropdown-label {
   color: #ffffff !important;
 }
 
-.theme-dropdown-item.active-theme-item:hover svg,
-[class*="theme-"] .theme-dropdown-item.active-theme-item:hover svg,
-.theme-dropdown-item.active-theme-item:hover .theme-dropdown-check,
-[class*="theme-"] .theme-dropdown-item.active-theme-item:hover .theme-dropdown-check {
-  color: #38bdf8 !important;
+/* === テーマ別 プルダウンメニュー スタイル === */
+
+/* 1. PAPER テーマ */
+.theme-paper .theme-dropdown-menu {
+  background-color: #F8F6F0 !important;
+  border: 1px solid #D0C5B4 !important;
+  box-shadow: 0 12px 30px rgba(74, 67, 58, 0.2), 0 0 0 1px rgba(208, 197, 180, 0.6) !important;
+}
+.theme-paper .theme-dropdown-header {
+  background-color: #EBE4D5 !important;
+  border-bottom: 1px solid #D0C5B4 !important;
+  color: #4A433A !important;
+}
+.theme-paper .theme-dropdown-header span {
+  color: #4A433A !important;
+}
+.theme-paper .theme-dropdown-item span,
+.theme-paper .theme-dropdown-item .theme-dropdown-label {
+  color: #4A433A !important;
+}
+.theme-paper .theme-dropdown-item:hover {
+  background-color: #EBE4D5 !important;
+  border-left-color: #D95430 !important;
+}
+.theme-paper .theme-dropdown-item:hover span,
+.theme-paper .theme-dropdown-item:hover .theme-dropdown-label {
+  color: #D95430 !important;
+}
+.theme-paper .theme-dropdown-item.active-theme-item {
+  background-color: #FDF1ED !important;
+  border-left-color: #D95430 !important;
+}
+.theme-paper .theme-dropdown-item.active-theme-item span,
+.theme-paper .theme-dropdown-item.active-theme-item .theme-dropdown-label,
+.theme-paper .theme-dropdown-item.active-theme-item svg,
+.theme-paper .theme-dropdown-item.active-theme-item .theme-dropdown-check {
+  color: #D95430 !important;
+}
+.theme-paper .theme-dropdown-item.active-theme-item:hover {
+  background-color: #FADCCE !important;
+}
+
+/* 2. LIGHT テーマ */
+.theme-light .theme-dropdown-menu {
+  background-color: #ffffff !important;
+  border: 1px solid #cbd5e1 !important;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.15), 0 0 0 1px rgba(203, 213, 225, 0.6) !important;
+}
+.theme-light .theme-dropdown-header {
+  background-color: #f1f5f9 !important;
+  border-bottom: 1px solid #cbd5e1 !important;
+  color: #334155 !important;
+}
+.theme-light .theme-dropdown-header span {
+  color: #334155 !important;
+}
+.theme-light .theme-dropdown-item span,
+.theme-light .theme-dropdown-item .theme-dropdown-label {
+  color: #334155 !important;
+}
+.theme-light .theme-dropdown-item:hover {
+  background-color: #f8fafc !important;
+  border-left-color: #475569 !important;
+}
+.theme-light .theme-dropdown-item:hover span,
+.theme-light .theme-dropdown-item:hover .theme-dropdown-label {
+  color: #0f172a !important;
+}
+.theme-light .theme-dropdown-item.active-theme-item {
+  background-color: #e2e8f0 !important;
+  border-left-color: #334155 !important;
+}
+.theme-light .theme-dropdown-item.active-theme-item span,
+.theme-light .theme-dropdown-item.active-theme-item .theme-dropdown-label,
+.theme-light .theme-dropdown-item.active-theme-item svg,
+.theme-light .theme-dropdown-item.active-theme-item .theme-dropdown-check {
+  color: #0f172a !important;
+}
+.theme-light .theme-dropdown-item.active-theme-item:hover {
+  background-color: #cbd5e1 !important;
+}
+
+/* 3. MOCHA テーマ */
+.theme-mocha .theme-dropdown-menu {
+  background-color: #3d2a1b !important;
+  border: 1px solid #543b27 !important;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(196, 164, 139, 0.2) !important;
+}
+.theme-mocha .theme-dropdown-header {
+  background-color: #2a1c12 !important;
+  border-bottom: 1px solid #543b27 !important;
+  color: #dcbfa9 !important;
+}
+.theme-mocha .theme-dropdown-header span {
+  color: #dcbfa9 !important;
+}
+.theme-mocha .theme-dropdown-item span,
+.theme-mocha .theme-dropdown-item .theme-dropdown-label {
+  color: #f5e8dc !important;
+}
+.theme-mocha .theme-dropdown-item:hover {
+  background-color: #543b27 !important;
+  border-left-color: #c4a48b !important;
+}
+.theme-mocha .theme-dropdown-item:hover span,
+.theme-mocha .theme-dropdown-item:hover .theme-dropdown-label {
+  color: #ffffff !important;
+}
+.theme-mocha .theme-dropdown-item.active-theme-item {
+  background-color: #241911 !important;
+  border-left-color: #c4a48b !important;
+}
+.theme-mocha .theme-dropdown-item.active-theme-item span,
+.theme-mocha .theme-dropdown-item.active-theme-item .theme-dropdown-label,
+.theme-mocha .theme-dropdown-item.active-theme-item svg,
+.theme-mocha .theme-dropdown-item.active-theme-item .theme-dropdown-check {
+  color: #fdf5eb !important;
+}
+.theme-mocha .theme-dropdown-item.active-theme-item:hover {
+  background-color: #332418 !important;
+}
+
+/* 4. LATTE テーマ */
+.theme-latte .theme-dropdown-menu {
+  background-color: #F2E8DC !important;
+  border: 1px solid #b5a086 !important;
+  box-shadow: 0 12px 30px rgba(74, 58, 41, 0.2), 0 0 0 1px rgba(181, 160, 134, 0.4) !important;
+}
+.theme-latte .theme-dropdown-header {
+  background-color: #E6D5C3 !important;
+  border-bottom: 1px solid #b5a086 !important;
+  color: #33261a !important;
+}
+.theme-latte .theme-dropdown-header span {
+  color: #33261a !important;
+}
+.theme-latte .theme-dropdown-item span,
+.theme-latte .theme-dropdown-item .theme-dropdown-label {
+  color: #33261a !important;
+}
+.theme-latte .theme-dropdown-item:hover {
+  background-color: #efe3d5 !important;
+  border-left-color: #66523d !important;
+}
+.theme-latte .theme-dropdown-item:hover span,
+.theme-latte .theme-dropdown-item:hover .theme-dropdown-label {
+  color: #1a100a !important;
+}
+.theme-latte .theme-dropdown-item.active-theme-item {
+  background-color: #e0d1c0 !important;
+  border-left-color: #66523d !important;
+}
+.theme-latte .theme-dropdown-item.active-theme-item span,
+.theme-latte .theme-dropdown-item.active-theme-item .theme-dropdown-label,
+.theme-latte .theme-dropdown-item.active-theme-item svg,
+.theme-latte .theme-dropdown-item.active-theme-item .theme-dropdown-check {
+  color: #1a100a !important;
+  font-weight: 800 !important;
+}
+.theme-latte .theme-dropdown-item.active-theme-item:hover {
+  background-color: #d4c5b0 !important;
+}
+
+/* 5. PINK (ROSE) テーマ */
+.theme-pink .theme-dropdown-menu {
+  background-color: #24181c !important;
+  border: 1px solid #52343c !important;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(140, 77, 88, 0.3) !important;
+}
+.theme-pink .theme-dropdown-header {
+  background-color: #1a1215 !important;
+  border-bottom: 1px solid #52343c !important;
+  color: #f0cfd7 !important;
+}
+.theme-pink .theme-dropdown-header span {
+  color: #f0cfd7 !important;
+}
+.theme-pink .theme-dropdown-item span,
+.theme-pink .theme-dropdown-item .theme-dropdown-label {
+  color: #f0cfd7 !important;
+}
+.theme-pink .theme-dropdown-item:hover {
+  background-color: #38242a !important;
+  border-left-color: #8C4D58 !important;
+}
+.theme-pink .theme-dropdown-item:hover span,
+.theme-pink .theme-dropdown-item:hover .theme-dropdown-label {
+  color: #ffffff !important;
+}
+.theme-pink .theme-dropdown-item.active-theme-item {
+  background-color: #3d1f25 !important;
+  border-left-color: #8C4D58 !important;
+}
+.theme-pink .theme-dropdown-item.active-theme-item span,
+.theme-pink .theme-dropdown-item.active-theme-item .theme-dropdown-label,
+.theme-pink .theme-dropdown-item.active-theme-item svg,
+.theme-pink .theme-dropdown-item.active-theme-item .theme-dropdown-check {
+  color: #fcf0f3 !important;
+}
+.theme-pink .theme-dropdown-item.active-theme-item:hover {
+  background-color: #4a2730 !important;
+}
+
+/* 6. RED テーマ */
+.theme-red .theme-dropdown-menu {
+  background-color: #1f1214 !important;
+  border: 1px solid #4a282d !important;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(158, 42, 42, 0.3) !important;
+}
+.theme-red .theme-dropdown-header {
+  background-color: #140b0c !important;
+  border-bottom: 1px solid #4a282d !important;
+  color: #f5d7dc !important;
+}
+.theme-red .theme-dropdown-header span {
+  color: #f5d7dc !important;
+}
+.theme-red .theme-dropdown-item span,
+.theme-red .theme-dropdown-item .theme-dropdown-label {
+  color: #f5d7dc !important;
+}
+.theme-red .theme-dropdown-item:hover {
+  background-color: #331c20 !important;
+  border-left-color: #9e2a2a !important;
+}
+.theme-red .theme-dropdown-item:hover span,
+.theme-red .theme-dropdown-item:hover .theme-dropdown-label {
+  color: #ffffff !important;
+}
+.theme-red .theme-dropdown-item.active-theme-item {
+  background-color: #3b1414 !important;
+  border-left-color: #9e2a2a !important;
+}
+.theme-red .theme-dropdown-item.active-theme-item span,
+.theme-red .theme-dropdown-item.active-theme-item .theme-dropdown-label,
+.theme-red .theme-dropdown-item.active-theme-item svg,
+.theme-red .theme-dropdown-item.active-theme-item .theme-dropdown-check {
+  color: #fcf0f2 !important;
+}
+.theme-red .theme-dropdown-item.active-theme-item:hover {
+  background-color: #481a1a !important;
+}
+
+/* 7. DARK テーマ */
+.theme-dark .theme-dropdown-menu {
+  background-color: #181b22 !important;
+  border: 1px solid #363d4c !important;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.7) !important;
+}
+.theme-dark .theme-dropdown-header {
+  background-color: #0f1115 !important;
+  border-bottom: 1px solid #262b36 !important;
+  color: #a2afc2 !important;
+}
+.theme-dark .theme-dropdown-header span {
+  color: #a2afc2 !important;
+}
+.theme-dark .theme-dropdown-item span,
+.theme-dark .theme-dropdown-item .theme-dropdown-label {
+  color: #cbd5e1 !important;
+}
+.theme-dark .theme-dropdown-item:hover {
+  background-color: #262b36 !important;
+  border-left-color: #445266 !important;
+}
+.theme-dark .theme-dropdown-item:hover span,
+.theme-dark .theme-dropdown-item:hover .theme-dropdown-label {
+  color: #ffffff !important;
+}
+.theme-dark .theme-dropdown-item.active-theme-item {
+  background-color: #1e2632 !important;
+  border-left-color: #445266 !important;
+}
+.theme-dark .theme-dropdown-item.active-theme-item span,
+.theme-dark .theme-dropdown-item.active-theme-item .theme-dropdown-label,
+.theme-dark .theme-dropdown-item.active-theme-item svg,
+.theme-dark .theme-dropdown-item.active-theme-item .theme-dropdown-check {
+  color: #8ba0bd !important;
+}
+.theme-dark .theme-dropdown-item.active-theme-item:hover {
+  background-color: #2b3646 !important;
 }
 
 /* Mocha & Latte: サイドバー最上部 [ ALL DATA ] 選択時のカラー最適化 (青緑の違和感を解消し、シックな焦げ茶＆白文字へ) */
@@ -563,103 +826,241 @@
   border-color: #b53333 !important;
 }
 
-/* Paper Theme Overrides (Clean Paper-White & Terracotta Vermilion #e05638) */
+/* Paper Theme Overrides (Industrial Paper Warm-Gray & Orange #D95430) */
 .theme-paper {
-  --color-slate-950: #f8f9fa; /* メイン背景：ペーパーホワイト */
-  --color-slate-900: #ffffff; /* カード・コンテナ：純白 */
-  --color-slate-800: #e2e8f0; /* 境界線・枠 */
-  --color-slate-700: #cbd5e1;
-  --color-slate-600: #94a3b8; 
-  --color-slate-500: #64748b; /* サブテキスト */
-  --color-slate-400: #475569; /* 通常テキスト */
-  --color-slate-300: #1e293b; /* 濃い文字 */
-  --color-slate-200: #0f172a; /* 最も濃い見出し文字 */
-  --color-slate-100: #0f172a; /* クッキリ濃い文字 */
-  --color-slate-50: #020617;
-  --color-white: #0f172a;    /* 反転文字 */
-  --color-black: #ffffff;    /* ボタン内の白文字 */
+  --color-slate-950: #F2EFE6; /* メイン背景：ペーパーカラー */
+  --color-slate-900: #F8F6F0; /* カード・コンテナ背景 */
+  --color-slate-800: #EBE4D5; /* 境界線・サブ背景・ヘッダー背景 */
+  --color-slate-700: #D0C5B4; /* 枠線 */
+  --color-slate-600: #A39686; 
+  --color-slate-500: #7D7265; /* サブテキスト・標準テキスト */
+  --color-slate-400: #635A4F; /* 通常テキスト */
+  --color-slate-300: #4A433A; /* 濃い文字 */
+  --color-slate-200: #332D27; /* 最も濃い見出し文字 */
+  --color-slate-100: #211C18; /* クッキリ見出し */
+  --color-slate-50: #120E0C;
+  --color-white: #4A433A;    /* 反転用テキスト */
+  --color-black: #FFFFFF;    /* ボタン内の白文字 */
   
-  --color-header-bg: #ffffff; /* 上部ヘッダー背景：ペーパーホワイト */
-  --color-overlay-bg: #1e293b;
+  --color-header-bg: #EBE4D5; /* 上部ヘッダー背景 */
+  --color-overlay-bg: #EBE4D5;
   
-  --scrollbar-thumb: rgba(224, 86, 56, 0.2);
-  --scrollbar-thumb-hover: rgba(224, 86, 56, 0.4);
+  --scrollbar-thumb: rgba(125, 114, 101, 0.25);
+  --scrollbar-thumb-hover: rgba(217, 84, 48, 0.5);
   
-  /* Paper Accent Palette (Terracotta Vermilion) */
-  --color-cyan-950: #fde8e3;
-  --color-cyan-900: #fbd3c9;
-  --color-cyan-800: #f7a896;
-  --color-cyan-700: #f07b61;
-  --color-cyan-600: #e05638; /* テラコッタ・テラコッタレッド */
-  --color-cyan-500: #e05638; 
-  --color-cyan-400: #c94426; /* 濃いアクセントテキスト */
-  --color-cyan-300: #1e293b;
-  --color-cyan-200: #0f172a;
+  /* Paper Accent Palette (#D95430 Vermilion Orange) */
+  --color-cyan-950: #FDF1ED;
+  --color-cyan-900: #FADCCE;
+  --color-cyan-800: #F5B8A3;
+  --color-cyan-700: #EE8E72;
+  --color-cyan-600: #D95430; /* 朱赤・テラコッタオレンジ */
+  --color-cyan-500: #D95430; 
+  --color-cyan-400: #C24422; /* 濃いアクセントテキスト */
+  --color-cyan-300: #4A433A;
+  --color-cyan-200: #211C18;
 }
 
 .theme-paper .bg-header-bg,
 .theme-paper .location-header-bar {
-  background-color: #ffffff !important;
-  border-color: #e2e8f0 !important;
+  background-color: #EBE4D5 !important;
+  border-color: #D0C5B4 !important;
 }
 
 .theme-paper .bg-header-bg h1,
 .theme-paper .bg-header-bg h2,
 .theme-paper .location-header-bar .location-title-text {
-  color: #0f172a !important;
+  color: #4A433A !important;
 }
 
 .theme-paper .bg-header-bg h1 {
   background: none !important;
-  -webkit-text-fill-color: #0f172a !important;
+  -webkit-text-fill-color: #4A433A !important;
 }
 
 .theme-paper .bg-header-bg .text-cyan-500,
 .theme-paper .bg-header-bg .text-cyan-600,
 .theme-paper .location-header-bar .text-slate-400,
 .theme-paper .location-header-bar .text-white\/90 {
-  color: #e05638 !important;
+  color: #D95430 !important;
 }
 
 .theme-paper .location-header-bar .border-white\/20 {
-  border-color: rgba(224, 86, 56, 0.3) !important;
+  border-color: rgba(125, 114, 101, 0.3) !important;
 }
 
 .theme-paper .slider-value-text {
-  color: #e05638 !important;
+  color: #D95430 !important;
 }
 
 .theme-paper .sidebar-container {
-  border-color: #e2e8f0 !important;
+  border-color: #D0C5B4 !important;
 }
 
 .theme-paper .sidebar-all-data-active {
-  background-color: #fde8e3 !important;
-  border-color: #e05638 !important;
-  color: #c94426 !important;
-  box-shadow: 0 1px 3px rgba(224, 86, 56, 0.15) !important;
+  background-color: #D95430 !important;
+  border-color: #C24422 !important;
+  color: #FFFFFF !important;
+  box-shadow: 0 1px 3px rgba(217, 84, 48, 0.25) !important;
 }
 
 .theme-paper .sidebar-all-data-active span,
 .theme-paper .sidebar-all-data-active svg {
-  color: #c94426 !important;
+  color: #FFFFFF !important;
 }
 
 .theme-paper .sidebar-all-data-badge-active {
-  background-color: #ffffff !important;
-  border-color: #e05638 !important;
-  color: #c94426 !important;
+  background-color: #FFFFFF !important;
+  border-color: #D95430 !important;
+  color: #D95430 !important;
 }
 
 .theme-paper .solid-square-slider {
-  background: #cbd5e1 !important;
-  border-color: #94a3b8 !important;
+  background: #D0C5B4 !important;
+  border-color: #7D7265 !important;
 }
 
-
 .theme-paper .custom-checkbox:checked {
-  background-color: #e05638 !important;
-  border-color: #e05638 !important;
+  background-color: #D95430 !important;
+  border-color: #D95430 !important;
+}
+
+.theme-paper .register-location-btn {
+  background-color: #D95430 !important;
+  color: #FFFFFF !important;
+  border: 1px solid #C24422 !important;
+}
+
+.theme-paper .register-location-btn:hover {
+  background-color: #C24422 !important;
+  border-color: #A83618 !important;
+}
+
+/* === PAPER Theme: 指示箇所の背景白スタイル (右上の細かいボタン・タブ・サイドバー開いた場所) === */
+
+/* 1. 右上のボタンのところ (細かいボタン群の背景を白に) */
+.theme-paper .open-map-btn,
+.theme-paper .header-action-btn {
+  background-color: #FFFFFF !important;
+  border-color: #D0C5B4 !important;
+  color: #4A433A !important;
+}
+
+.theme-paper .open-map-btn svg,
+.theme-paper .header-action-btn svg {
+  color: #4A433A !important;
+}
+
+.theme-paper .open-map-btn:hover,
+.theme-paper .header-action-btn:hover {
+  background-color: #FFFFFF !important;
+  border-color: #D95430 !important;
+  color: #D95430 !important;
+}
+
+.theme-paper .open-map-btn:hover svg,
+.theme-paper .header-action-btn:hover svg {
+  color: #D95430 !important;
+}
+
+/* 2. タブのところ (印した状態のタブの背景を白に) */
+.theme-paper .tab-btn-item {
+  background-color: #FFFFFF !important;
+  border-color: #D0C5B4 !important;
+  color: #635A4F !important;
+}
+
+.theme-paper .tab-btn-item span {
+  color: #635A4F !important;
+}
+
+.theme-paper .tab-btn-item.tab-btn-active {
+  background-color: #FFFFFF !important;
+  border-color: #D95430 !important;
+  border-style: solid !important;
+  color: #211C18 !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08) !important;
+}
+
+.theme-paper .tab-btn-item.tab-btn-active span {
+  color: #211C18 !important;
+}
+
+.theme-paper .tab-btn-item.tab-btn-inactive {
+  background-color: #FFFFFF !important;
+  border-color: #D0C5B4 !important;
+  border-style: dashed !important;
+  color: #7D7265 !important;
+}
+
+.theme-paper .tab-btn-item.tab-btn-inactive span {
+  color: #7D7265 !important;
+}
+
+.theme-paper .tab-btn-item:hover {
+  background-color: #FFFFFF !important;
+  border-color: #D95430 !important;
+  color: #D95430 !important;
+}
+
+.theme-paper .tab-btn-item:hover span {
+  color: #D95430 !important;
+}
+
+.theme-paper .tab-btn-item svg {
+  color: #7D7265 !important;
+}
+
+.theme-paper .tab-btn-item:hover svg {
+  color: #D95430 !important;
+}
+
+/* 3. サイドバーのカテゴリーを開いた場所のところ (背景を白にし、透明度を反映) */
+.theme-paper .sidebar-opened-items {
+  background-color: rgba(255, 255, 255, var(--sidebar-opacity, 1)) !important;
+  border: 1px solid rgba(208, 197, 180, var(--sidebar-opacity, 1)) !important;
+  border-radius: 2px !important;
+  padding: 3px 4px !important;
+  margin-top: 3px !important;
+  margin-bottom: 3px !important;
+}
+
+.theme-paper .sidebar-opened-items .sidebar-location-item {
+  background-color: transparent !important;
+  color: #211C18 !important;
+  border-bottom: 1px solid rgba(242, 239, 230, var(--sidebar-opacity, 1)) !important;
+}
+
+.theme-paper .sidebar-opened-items .sidebar-location-item:last-child {
+  border-bottom: none !important;
+}
+
+.theme-paper .sidebar-opened-items .sidebar-location-item:hover {
+  background-color: rgba(248, 246, 240, var(--sidebar-opacity, 1)) !important;
+}
+
+.theme-paper .sidebar-opened-items .sidebar-location-item span {
+  color: #211C18 !important;
+}
+
+.theme-paper .sidebar-opened-items .sidebar-location-item .text-slate-400 {
+  color: #7D7265 !important;
+}
+
+.theme-paper .sidebar-opened-items .sidebar-location-item:hover span {
+  color: #D95430 !important;
+}
+
+.theme-paper .sidebar-opened-items .sidebar-location-item:hover .text-slate-400 {
+  color: #7D7265 !important;
+}
+
+.theme-paper .sidebar-opened-items .sidebar-location-item.bg-cyan-500\/20 {
+  background-color: rgba(253, 241, 237, var(--sidebar-opacity, 1)) !important;
+  border-left-color: #D95430 !important;
+}
+
+.theme-paper .sidebar-opened-items .sidebar-location-item.bg-cyan-500\/20 span {
+  color: #D95430 !important;
 }
 
 /* Global scrollbar styling to make it subtle across all browsers */
